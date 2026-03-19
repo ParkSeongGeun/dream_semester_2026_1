@@ -60,7 +60,7 @@ DATABASE_URL=postgresql://user:password@localhost:5432/comfortablemove
 REDIS_URL=redis://localhost:6379/0
 
 # Seoul Bus API
-SEOUL_BUS_API_KEY=YOUR_API_KEY_HERE
+SEOUL_BUS_API_KEY=your_seoul_bus_api_key_here
 
 # App
 APP_VERSION=1.0.0
