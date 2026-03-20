@@ -44,3 +44,13 @@
   # Database
   *.db
   *.sqlite3
+
+  # Logs
+  *.log
+  
+  # Load Testing Reports
+  load_test_report.html
+  
+  # OS
+  .DS_Store
+  Thumbs.db
