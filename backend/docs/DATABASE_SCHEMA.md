@@ -25,7 +25,8 @@
   | `device_name` | VARCHAR(100) | YES | NULL | 기기 이름 (예: "iPhone 14 Pro") |
   | `os_version` | VARCHAR(20) | YES | NULL | iOS 버전 (예: "iOS 17.2") |
   | `app_version` | VARCHAR(20) | YES | NULL | 앱 버전 (예: "1.2.1") |
-  | `is_verified` | BOOLEAN | NO | FALSE | 임산부 인증 여부 (향후 사용) |
+  | `is_verified` | BOOLEAN | NO | FALSE | 임산부 인증 여부 |
+  | `due_date` | DATE | YES | NULL | 출산 예정일 (임신 기간 추적용) |
   | `sound_enabled` | BOOLEAN | NO | TRUE | 알림음 설정 |
   | `created_at` | TIMESTAMP WITH TIME ZONE | NO | CURRENT_TIMESTAMP | 기기 등록 시간 |
   | `last_active_at` | TIMESTAMP WITH TIME ZONE | NO | CURRENT_TIMESTAMP | 마지막 활동 시간 |
@@ -45,6 +46,7 @@
 
       -- User Profile
       is_verified BOOLEAN DEFAULT FALSE,
+      due_date DATE,
 
       -- Settings
       sound_enabled BOOLEAN DEFAULT TRUE,
@@ -69,7 +71,11 @@
   2. device_token이 NULL 허용인 이유
     - 초기에는 익명 사용 허용
     - 나중에 회원가입 기능 추가 시 업데이트
-  3. 인덱스 전략
+  3. due_date 필드 추가 이유
+    - 출산 예정일을 저장하여 임신 기간 추적
+    - 임산부 인증 시 is_verified와 함께 활용
+    - NULL 허용: 임산부가 아닌 일반 사용자 지원
+  4. 인덱스 전략
     - last_active_at: 비활성 사용자 정리 쿼리 최적화
     - device_token: 기기로 사용자 검색 시 성능 향상
 

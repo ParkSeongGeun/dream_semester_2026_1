@@ -19,6 +19,7 @@ erDiagram
         varchar os_version "iOS 버전"
         varchar app_version "앱 버전"
         boolean is_verified "임산부 인증 여부"
+        date due_date "출산 예정일"
         boolean sound_enabled "알림음 설정"
         timestamp created_at "등록 시간"
         timestamp last_active_at "마지막 활동 시간"
@@ -389,3 +390,4 @@ UK  = Unique Key (고유 키)
 | 날짜 | 버전 | 변경 내용 |
 |------|------|-----------|
 | 2026-03-08 | 1.0.0 | 초기 ERD 설계 |
+| 2026-03-18 | 1.1.0 | due_date 필드 추가 (출산 예정일) |

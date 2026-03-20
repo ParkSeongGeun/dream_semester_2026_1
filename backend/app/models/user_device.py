@@ -7,9 +7,9 @@ iOS 기기 정보를 저장하는 테이블 (users_devices)
 """
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
 
-from sqlalchemy import Boolean, CheckConstraint, String, func
+from sqlalchemy import Boolean, CheckConstraint, Date, String, func
 from sqlalchemy.dialects.postgresql import TIMESTAMP, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -54,7 +54,12 @@ class UserDevice(Base):
     is_verified: Mapped[bool] = mapped_column(
         Boolean,
         default=False,
-        comment="임산부 인증 여부 (향후 사용)",
+        comment="임산부 인증 여부",
+    )
+    due_date: Mapped[date | None] = mapped_column(
+        Date,
+        nullable=True,
+        comment="출산 예정일 (임신 기간 추적용)",
     )
 
     # Settings
