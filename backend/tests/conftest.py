@@ -6,15 +6,30 @@ Pytest Configuration and Fixtures
 
 import os
 import pytest
+import pytest_asyncio
 import asyncio
 from typing import AsyncGenerator
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
-from sqlalchemy.pool import NullPool
+from sqlalchemy.pool import StaticPool
 
 from app.main import app
 from app.db.session import get_db
 from app.models.base import Base
+
+
+# ============================================
+# SQLite - PostgreSQL 타입 호환성 설정
+# ============================================
+
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID, TIMESTAMP as PG_TIMESTAMP
+from sqlalchemy.ext.compiler import compiles
+
+# SQLite에서 PostgreSQL UUID → CHAR(36) 으로 렌더링
+compiles(PG_UUID, "sqlite")(lambda type_, compiler, **kw: "CHAR(36)")
+
+# SQLite에서 PostgreSQL TIMESTAMP → TIMESTAMP 으로 렌더링
+compiles(PG_TIMESTAMP, "sqlite")(lambda type_, compiler, **kw: "TIMESTAMP")
 
 
 # ============================================
@@ -38,7 +53,8 @@ TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 test_engine = create_async_engine(
     TEST_DATABASE_URL,
     echo=False,
-    poolclass=NullPool,
+    connect_args={"check_same_thread": False},
+    poolclass=StaticPool,
 )
 
 TestSessionLocal = async_sessionmaker(
@@ -48,15 +64,35 @@ TestSessionLocal = async_sessionmaker(
 )
 
 
-# event_loop fixture removed - use pytest-asyncio default
+def _create_tables_for_sqlite(conn):
+    """SQLite에서 PostgreSQL 전용 CHECK 제약조건을 제거 후 테이블 생성"""
+    from sqlalchemy import CheckConstraint as CC
+
+    for table in Base.metadata.sorted_tables:
+        # PostgreSQL regex(~) 연산자를 사용하는 제약조건 필터링
+        original_constraints = list(table.constraints)
+        pg_only = [
+            c for c in table.constraints
+            if isinstance(c, CC) and c.sqltext is not None and "~" in str(c.sqltext)
+        ]
+        for c in pg_only:
+            table.constraints.discard(c)
+
+    Base.metadata.create_all(conn)
+
+    # 제거했던 제약조건 복원
+    for table in Base.metadata.sorted_tables:
+        for c in pg_only:
+            if c.parent is table:
+                table.constraints.add(c)
 
 
-@pytest.fixture(scope="function")
+@pytest_asyncio.fixture(scope="function")
 async def test_db():
     """테스트용 데이터베이스 세션"""
-    # 테이블 생성
+    # 테이블 생성 (SQLite 호환)
     async with test_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(_create_tables_for_sqlite)
 
     session = TestSessionLocal()
     try:
@@ -68,7 +104,7 @@ async def test_db():
             await conn.run_sync(Base.metadata.drop_all)
 
 
-@pytest.fixture(scope="function")
+@pytest_asyncio.fixture(scope="function")
 async def client(test_db: AsyncSession):
     """FastAPI 테스트 클라이언트"""
 
@@ -168,6 +204,60 @@ def mock_seoul_api_no_data():
         },
         "msgBody": None,
     }
+
+
+# ============================================
+# Seoul Bus API Test Fixtures
+# ============================================
+
+@pytest.fixture
+def seoul_api_test_locations():
+    """Seoul Bus API 테스트용 위치 데이터"""
+    return {
+        "seoul_station": {
+            "latitude": 37.5547125,
+            "longitude": 126.9707878,
+            "ars_id": "01234",
+        },
+        "gangnam_station": {
+            "latitude": 37.4979461,
+            "longitude": 127.0276188,
+            "ars_id": "23288",
+        },
+        "busan": {
+            "latitude": 35.1795543,
+            "longitude": 129.0756416,
+        },
+    }
+
+
+@pytest.fixture
+def bus_type_test_cases():
+    """버스 유형 분류 테스트 케이스"""
+    return [
+        ("3", "간선"),
+        ("4", "지선"),
+        ("6", "광역"),
+        ("1", "공항"),
+        ("2", "마을"),
+        ("5", "순환"),
+        ("7", "인천"),
+        ("99", "기타"),
+    ]
+
+
+@pytest.fixture
+def congestion_test_cases():
+    """혼잡도 파싱 테스트 케이스"""
+    return [
+        ("3", "empty"),
+        ("4", "normal"),
+        ("5", "crowded"),
+        (None, "unknown"),
+        ("", "unknown"),
+        ("0", "unknown"),
+        ("99", "unknown"),
+    ]
 
 
 # ============================================
