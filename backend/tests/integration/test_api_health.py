@@ -15,7 +15,7 @@ class TestHealthAPI:
 
     async def test_health_check_success(self, client: AsyncClient):
         """헬스체크 - 성공"""
-        response = await client.get("/health")
+        response = await client.get("/api/v1/health")
 
         assert response.status_code in [200, 503]  # healthy or unhealthy
         data = response.json()
@@ -34,7 +34,7 @@ class TestHealthAPI:
 
     async def test_health_check_response_structure(self, client: AsyncClient):
         """헬스체크 응답 구조 검증"""
-        response = await client.get("/health")
+        response = await client.get("/api/v1/health")
         data = response.json()
 
         # status 값 확인
