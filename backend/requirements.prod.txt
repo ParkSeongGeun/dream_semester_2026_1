@@ -7,11 +7,9 @@ pydantic-settings==2.1.0
 # Database
 sqlalchemy==2.0.25
 asyncpg==0.29.0
-alembic==1.13.1
 
 # Redis Cache
 redis==5.0.1
-aioredis==2.0.1
 
 # HTTP Client
 httpx==0.26.0
