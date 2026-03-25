@@ -140,13 +140,11 @@ gunicorn==21.2.0  # 프로덕션 WSGI/ASGI 서버
 # Stage 1: Builder - 의존성 설치
 FROM python:3.12-slim AS builder
 WORKDIR /build
-RUN apt-get update && apt-get install -y --no-install-recommends gcc libpq-dev
 COPY requirements.prod.txt .
 RUN pip install --no-cache-dir --prefix=/install -r requirements.prod.txt
 
 # Stage 2: Runtime - 최종 이미지
 FROM python:3.12-slim AS runtime
-RUN apt-get update && apt-get install -y --no-install-recommends libpq5 curl
 RUN groupadd --gid 1000 appuser && \
     useradd --uid 1000 --gid appuser --create-home appuser
 COPY --from=builder /install /usr/local
@@ -160,7 +158,7 @@ ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:8000/api/v1/health || exit 1
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')" || exit 1
 
 CMD ["gunicorn", "app.main:app", \
      "--worker-class", "uvicorn.workers.UvicornWorker", \
@@ -178,7 +176,7 @@ CMD ["gunicorn", "app.main:app", \
 | 멀티스테이지 | 2단계 (builder → runtime) | 빌드 도구(gcc) 제거로 이미지 최소화 |
 | 유저 | non-root (`appuser`) | 컨테이너 보안 강화 |
 | 서버 | Gunicorn + Uvicorn Worker | 프로덕션 급 프로세스 관리 |
-| 헬스체크 | curl 기반 | 컨테이너 헬스 상태 자동 모니터링 |
+| 헬스체크 | Python urllib 기반 | curl 제거로 이미지 경량화 |
 
 #### 4. Docker 이미지 빌드 및 검증
 
@@ -187,18 +185,22 @@ $ docker build -t comfortablemove-backend:1.0.0 .
 
 $ docker images comfortablemove-backend
 REPOSITORY                TAG       IMAGE ID       SIZE
-comfortablemove-backend   1.0.0     f18ce678b434   339MB
-comfortablemove-backend   latest    f18ce678b434   339MB
+comfortablemove-backend   1.0.0     66de124ed711   313MB
+comfortablemove-backend   latest    66de124ed711   313MB
 ```
 
 **이미지 크기 분석**:
 - Debian 베이스: ~109MB (python:3.12-slim 기본)
 - Python 런타임: ~45MB
-- 애플리케이션 패키지: ~91MB (asyncpg, SQLAlchemy 등)
-- 런타임 라이브러리(libpq, curl): ~15MB
+- 애플리케이션 패키지: ~76MB (asyncpg, SQLAlchemy 등)
 - 애플리케이션 코드: ~0.4MB
 
-> 참고: Python 기반 비동기 웹 애플리케이션의 현실적인 크기입니다. Alpine 이미지를 사용하면 더 줄일 수 있으나, asyncpg/SQLAlchemy의 glibc 의존성으로 slim을 선택했습니다.
+**경량화 작업** (339MB → 313MB, -26MB):
+- `aioredis` 제거: redis-py 5.x가 이미 async 지원 (deprecated 패키지)
+- `alembic` 제거: 현재 마이그레이션 미사용, `init_db()`로 테이블 생성
+- `curl` + `libpq5` 제거: asyncpg 자체 libpq 내장, 헬스체크를 Python urllib로 대체
+
+> 참고: `python:3.12-slim` 베이스 자체가 ~154MB(Debian + Python 런타임)이므로, Python 기반 비동기 앱에서 100MB 이하는 현실적으로 불가능합니다. Alpine은 asyncpg의 glibc 의존성으로 사용 불가.
 
 #### 5. Docker Compose 업데이트
 
@@ -222,7 +224,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -306,22 +308,21 @@ REDIS_URL=redis://redis:6379/0
 ENVIRONMENT=production
 ```
 
-#### 8. Docker 이미지 태깅
+#### 8. Docker Hub 푸시 및 버전 태깅
 
 ```bash
-$ docker tag comfortablemove-backend:1.0.0 comfortablemove-backend:latest
+$ docker tag comfortablemove-backend:1.0.0 phd0801/comfortablemove-backend:1.0.0
+$ docker tag comfortablemove-backend:1.0.0 phd0801/comfortablemove-backend:latest
 
-$ docker images comfortablemove-backend
-REPOSITORY                TAG       IMAGE ID       SIZE
-comfortablemove-backend   1.0.0     f18ce678b434   339MB
-comfortablemove-backend   latest    f18ce678b434   339MB
+$ docker push phd0801/comfortablemove-backend:1.0.0
+1.0.0: digest: sha256:9a80b658... size: 856
+
+$ docker push phd0801/comfortablemove-backend:latest
+latest: digest: sha256:9a80b658... size: 856
 ```
 
-Docker Hub 푸시 명령어 (배포 시 사용):
-```bash
-$ docker tag comfortablemove-backend:1.0.0 <dockerhub-username>/comfortablemove-backend:1.0.0
-$ docker push <dockerhub-username>/comfortablemove-backend:1.0.0
-```
+**Docker Hub 레포지토리**: `phd0801/comfortablemove-backend`
+**배포된 태그**: `1.0.0`, `latest`
 
 ---
 
@@ -345,9 +346,10 @@ $ docker push <dockerhub-username>/comfortablemove-backend:1.0.0
 | `Dockerfile` | ✅ 완료 | 멀티스테이지 빌드 |
 | `docker-compose.yml` | ✅ 완료 | 3서비스 구성 (backend + postgres + redis) |
 | `.env.docker` | ✅ 완료 | Docker 환경변수 |
-| 이미지 빌드 | ✅ 완료 | 339MB (python:3.12-slim 기반) |
+| 이미지 빌드 | ✅ 완료 | 313MB (python:3.12-slim 기반, 경량화 적용) |
 | 전체 스택 실행 | ✅ 완료 | 3개 컨테이너 모두 healthy |
 | 이미지 태깅 | ✅ 완료 | 1.0.0 + latest |
+| Docker Hub 푸시 | ✅ 완료 | `phd0801/comfortablemove-backend` |
 
 ---
 
@@ -429,17 +431,6 @@ Docker Compose 내부에서는 `localhost` 대신 **서비스명**(postgres, red
 
 ---
 
-## 🚧 미완료 항목
-
-### 1. Docker Hub 푸시
-- Docker Hub 계정 설정 후 이미지 푸시 필요
-- 이미지 태깅은 완료 (1.0.0 + latest)
-
-### 2. 이미지 크기 추가 최적화
-- 현재 339MB → 추후 불필요한 라이브러리 제거로 개선 가능
-
----
-
 ## 🔄 다음 주 (5주차) 계획
 
 ### 1. CI/CD 파이프라인 구축
@@ -466,14 +457,12 @@ Docker Compose 내부에서는 `localhost` 대신 **서비스명**(postgres, red
 
 ### 아쉬운 점
 
-1. **이미지 크기**: 100MB 목표 대비 339MB로 초과 (Python 기반의 현실적 한계)
-2. **Docker Hub 푸시 미완료**: 계정 설정 필요
+1. **이미지 크기**: `python:3.12-slim` 베이스 자체가 ~154MB로, Python 앱에서 100MB 이하는 구조적으로 불가능 (Alpine은 asyncpg glibc 의존성 문제)
 
 ### 개선 방향
 
-1. 불필요한 Python 패키지 제거로 이미지 크기 추가 최적화
-2. CI/CD 파이프라인 구축으로 자동 빌드/푸시 체계 구축
-3. 프로덕션 환경에서의 부하 테스트
+1. CI/CD 파이프라인 구축으로 자동 빌드/푸시 체계 구축
+2. 프로덕션 환경에서의 부하 테스트
 
 ---
 
