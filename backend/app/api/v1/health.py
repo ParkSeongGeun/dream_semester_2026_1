@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from app.core.config import settings
-from app.core.redis import check_redis_health
+from app.core.redis import check_redis_health, get_cache_stats
 from app.db.session import AsyncSessionLocal
 from app.schemas.health import HealthCheckResponse, ServiceStatus
 from app.services.seoul_bus_api import seoul_bus_service
@@ -43,9 +43,9 @@ async def health_check():
         async with AsyncSessionLocal() as session:
             await session.execute(text("SELECT 1"))
         db_status = "connected"
-    except Exception as e:
+    except Exception:
         db_status = "disconnected"
-        errors.append(f"Database connection failed: {str(e)}")
+        errors.append("Database connection failed")
 
     # Redis 연결 확인
     redis_status = "connected" if await check_redis_health() else "disconnected"
@@ -88,3 +88,19 @@ async def health_check():
         content=response_data.model_dump(mode="json"),
         status_code=status_code,
     )
+
+
+@router.get(
+    "/health/cache",
+    summary="캐시 상태 조회",
+    description="Redis 캐시 키 분류별 통계를 조회합니다.",
+)
+async def cache_health():
+    """
+    Redis 캐시 통계 엔드포인트
+
+    Returns:
+        dict: 캐시 키 개수, 메모리 사용량 등
+    """
+    stats = await get_cache_stats()
+    return JSONResponse(content=stats)

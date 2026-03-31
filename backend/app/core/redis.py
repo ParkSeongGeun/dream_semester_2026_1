@@ -5,11 +5,14 @@ Redis 연결 및 캐싱 유틸리티 함수를 제공합니다.
 """
 
 import json
+import logging
 from typing import Any
 
 import redis.asyncio as redis
 
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 # Redis 클라이언트 인스턴스
 redis_client: redis.Redis | None = None
@@ -93,9 +96,10 @@ async def set_cache(
         else:
             await client.set(key, value_str)
 
+        logger.debug(f"Cache SET: {key} (TTL={ttl}s)")
         return True
     except Exception as e:
-        print(f"Redis set error: {e}")
+        logger.warning(f"Redis set error: {e}")
         return False
 
 
@@ -121,7 +125,10 @@ async def get_cache(key: str) -> Any | None:
         value = await client.get(key)
 
         if value is None:
+            logger.debug(f"Cache MISS: {key}")
             return None
+
+        logger.debug(f"Cache HIT: {key}")
 
         # JSON 파싱 시도
         try:
@@ -130,7 +137,7 @@ async def get_cache(key: str) -> Any | None:
             return value
 
     except Exception as e:
-        print(f"Redis get error: {e}")
+        logger.warning(f"Redis get error (fallback to None): {e}")
         return None
 
 
@@ -149,7 +156,7 @@ async def delete_cache(key: str) -> bool:
         await client.delete(key)
         return True
     except Exception as e:
-        print(f"Redis delete error: {e}")
+        logger.warning(f"Redis delete error: {e}")
         return False
 
 
@@ -172,15 +179,13 @@ async def clear_cache_pattern(pattern: str) -> int:
     """
     try:
         client = await get_redis()
-        keys = await client.keys(pattern)
-
-        if not keys:
-            return 0
-
-        await client.delete(*keys)
-        return len(keys)
+        deleted = 0
+        async for key in client.scan_iter(match=pattern, count=100):
+            await client.delete(key)
+            deleted += 1
+        return deleted
     except Exception as e:
-        print(f"Redis clear pattern error: {e}")
+        logger.warning(f"Redis clear pattern error: {e}")
         return 0
 
 
@@ -197,3 +202,32 @@ async def check_redis_health() -> bool:
         return True
     except Exception:
         return False
+
+
+async def get_cache_stats() -> dict[str, Any]:
+    """
+    Redis 캐시 통계를 조회합니다.
+
+    Returns:
+        dict: 캐시 통계 (키 개수, 메모리 사용량 등)
+    """
+    try:
+        client = await get_redis()
+        info = await client.info("memory")
+        db_size = await client.dbsize()
+
+        # 캐시 키 분류별 개수 (SCAN으로 안전하게 조회)
+        arrival_keys = [key async for key in client.scan_iter(match="arrivals:*", count=100)]
+        stats_keys = [key async for key in client.scan_iter(match="stats:*", count=100)]
+
+        return {
+            "total_keys": db_size,
+            "arrival_cache_keys": len(arrival_keys),
+            "statistics_cache_keys": len(stats_keys),
+            "used_memory_human": info.get("used_memory_human", "N/A"),
+            "used_memory_bytes": info.get("used_memory", 0),
+            "maxmemory_human": info.get("maxmemory_human", "N/A"),
+        }
+    except Exception as e:
+        logger.warning(f"Redis stats error: {e}")
+        return {"error": str(e)}
