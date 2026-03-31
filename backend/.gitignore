@@ -30,6 +30,8 @@ ENV/
 .env
 .env.local
 .env.docker
+.env.dev
+.env.test
 
 # IDE
 .vscode/
