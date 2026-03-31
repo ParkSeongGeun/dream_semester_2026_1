@@ -39,51 +39,82 @@
 
 ### Prerequisites
 
-- Python 3.11+
-- Docker & Docker Compose
+- Python 3.12+
+- Docker & Docker Compose v2
 - Git
 
-### 1. 프로젝트 클론
+### 방법 1: Docker Compose 원클릭 실행 (권장)
 
 ```bash
-cd /Users/parkseonggeun/Desktop/드림학기제/dream_semester_2026_1/backend
+# 1. 환경 변수 설정
+cp .env.example .env.docker
+# .env.docker 파일을 열어 SEOUL_BUS_API_KEY 등 필요한 값을 입력
+
+# 2. 전체 스택 실행 (Backend + PostgreSQL + Redis)
+docker compose up -d
+
+# 3. 상태 확인
+docker compose ps
+
+# 4. API 문서 확인
+# 브라우저에서 http://localhost:8000/docs 접속
 ```
 
-### 2. 가상환경 설정
+### 방법 2: 개발 환경 (핫리로드 지원)
 
 ```bash
-# 가상환경 생성
-python3 -m venv venv
+# 1. 환경 변수 설정
+cp .env.example .env.dev
+# .env.dev 파일을 열어 필요한 값을 입력
 
-# 활성화 (Mac/Linux)
-source venv/bin/activate
+# 2. 개발 모드 실행 (소스코드 변경 시 자동 재시작)
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 
-# 의존성 설치
+# 3. 로그 실시간 확인
+docker compose logs -f backend
+```
+
+### 방법 3: 로컬 직접 실행
+
+```bash
+# 1. 가상환경 설정
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
-```
 
-### 3. 환경 변수 설정
-
-```bash
-# .env 파일 생성
+# 2. 환경 변수 설정
 cp .env.example .env
-```
 
-### 4. Docker 실행 (PostgreSQL + Redis)
+# 3. PostgreSQL + Redis만 Docker로 실행
+docker compose up -d postgres redis
 
-```bash
-docker-compose up -d
-```
-
-### 5. 서버 실행
-
-```bash
+# 4. FastAPI 서버 실행
 uvicorn app.main:app --reload
 ```
 
-### 6. API 문서 확인
+### 환경별 Docker Compose 구성
 
-브라우저에서 http://localhost:8000/docs 접속
+| 환경 | 명령어 | 환경변수 | 특징 |
+|---|---|---|---|
+| **프로덕션** | `docker compose up -d` | `.env.docker` | Gunicorn, 최적화 |
+| **개발** | `docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d` | `.env.dev` | 핫리로드, 디버그 |
+| **테스트** | `docker compose -f docker-compose.yml -f docker-compose.test.yml up --abort-on-container-exit` | `.env.test` | pytest 자동 실행 |
+
+### 유용한 명령어
+
+```bash
+# 전체 컨테이너 중지
+docker compose down
+
+# 볼륨 포함 완전 삭제 (데이터 초기화)
+docker compose down -v
+
+# PostgreSQL 데이터 영속성 테스트
+bash scripts/test_persistence.sh
+
+# 캐시 상태 확인
+curl http://localhost:8000/api/v1/health/cache
+```
 
 ---
 
@@ -166,15 +197,23 @@ pytest tests/integration/test_seoul_bus_api.py -v
 
 ```
 backend/
-├── app/                    # 애플리케이션 코드
-│   ├── api/                # API 엔드포인트
-│   ├── models/             # SQLAlchemy 모델
-│   ├── schemas/            # Pydantic 스키마
-│   ├── services/           # 비즈니스 로직
-│   └── core/               # 핵심 유틸리티
-├── tests/                  # 테스트 코드
-├── docs/                   # 문서
-└── docker-compose.yml      # Docker 설정
+├── app/                        # 애플리케이션 코드
+│   ├── api/v1/                 # API 엔드포인트
+│   ├── models/                 # SQLAlchemy 모델
+│   ├── schemas/                # Pydantic 스키마
+│   ├── services/               # 비즈니스 로직
+│   ├── core/                   # 핵심 유틸리티 (config, redis)
+│   └── db/                     # 데이터베이스 세션
+├── tests/                      # 테스트 코드 (99개)
+├── scripts/                    # 유틸리티 스크립트
+├── docs/                       # 문서
+├── Dockerfile                  # 프로덕션 빌드
+├── Dockerfile.test             # 테스트 빌드
+├── docker-compose.yml          # 기본 Compose (3서비스)
+├── docker-compose.dev.yml      # 개발환경 오버라이드
+├── docker-compose.test.yml     # 테스트환경 오버라이드
+├── requirements.txt            # 전체 의존성
+└── requirements.prod.txt       # 프로덕션 의존성
 ```
 
 ---
@@ -285,5 +324,5 @@ This project is part of Dream Semester 2026-1.
 
 ---
 
-**버전**: 1.0.0
-**최종 수정**: 2026-03-08
+**버전**: 1.1.0
+**최종 수정**: 2026-03-31
