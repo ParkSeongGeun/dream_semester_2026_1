@@ -1,0 +1,47 @@
+# ============================================
+# ComfortableMove - Docker Compose (Test)
+# ============================================
+# 사용법: docker compose -f docker-compose.yml -f docker-compose.test.yml up --abort-on-container-exit
+#
+# 테스트환경 특징:
+#   - 격리된 DB/Redis (테스트 전용 컨테이너명)
+#   - 테스트 코드 포함 빌드
+#   - pytest 자동 실행 후 종료
+#   - 볼륨 미사용 (매 실행 시 초기화)
+# ============================================
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: comfortablemove_backend_test
+    env_file:
+      - .env.test
+    volumes:
+      - ./app:/app/app:cached
+      - ./tests:/app/tests:cached
+    command: >
+      python -m pytest tests/ -v
+      --cov=app
+      --cov-report=term-missing
+      -m "not slow"
+    environment:
+      - ENVIRONMENT=testing
+      - DEBUG=false
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  postgres:
+    container_name: comfortablemove_db_test
+    environment:
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_password
+      POSTGRES_DB: comfortablemove_test
+
+  redis:
+    container_name: comfortablemove_redis_test
+    command: redis-server --appendonly no --save "" --maxmemory 32mb --maxmemory-policy allkeys-lru

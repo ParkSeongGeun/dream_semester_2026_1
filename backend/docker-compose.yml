@@ -1,4 +1,15 @@
+# ============================================
+# ComfortableMove - Docker Compose (Base)
+# ============================================
+# 기본 구성 파일. 개발/테스트 환경은 오버라이드 파일 사용:
+#   개발: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#   테스트: docker compose -f docker-compose.yml -f docker-compose.test.yml up
+# ============================================
+
 services:
+  # ----------------------------------------
+  # FastAPI Backend
+  # ----------------------------------------
   backend:
     build:
       context: .
@@ -8,6 +19,8 @@ services:
       - .env.docker
     ports:
       - "8000:8000"
+    networks:
+      - comfortablemove_network
     depends_on:
       postgres:
         condition: service_healthy
@@ -21,6 +34,9 @@ services:
       retries: 3
       start_period: 15s
 
+  # ----------------------------------------
+  # PostgreSQL Database
+  # ----------------------------------------
   postgres:
     image: postgres:15
     container_name: comfortablemove_db
@@ -30,6 +46,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-comfortablemove}
     ports:
       - "5432:5432"
+    networks:
+      - comfortablemove_network
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -38,11 +56,17 @@ services:
       timeout: 5s
       retries: 5
 
+  # ----------------------------------------
+  # Redis Cache
+  # ----------------------------------------
   redis:
     image: redis:7
     container_name: comfortablemove_redis
+    command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru
     ports:
       - "6379:6379"
+    networks:
+      - comfortablemove_network
     volumes:
       - redis_data:/data
     healthcheck:
@@ -51,6 +75,19 @@ services:
       timeout: 5s
       retries: 5
 
+# ----------------------------------------
+# Networks
+# ----------------------------------------
+networks:
+  comfortablemove_network:
+    driver: bridge
+    name: comfortablemove_network
+
+# ----------------------------------------
+# Volumes
+# ----------------------------------------
 volumes:
   postgres_data:
+    name: comfortablemove_postgres_data
   redis_data:
+    name: comfortablemove_redis_data

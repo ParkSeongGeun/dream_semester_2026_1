@@ -1,0 +1,46 @@
+# ============================================
+# ComfortableMove - Docker Compose (Development)
+# ============================================
+# 사용법: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#
+# 개발환경 특징:
+#   - 소스코드 바인드 마운트 (핫리로드)
+#   - 디버그 모드 활성화
+#   - Uvicorn --reload 모드
+#   - PostgreSQL 로컬 접근 포트 노출
+# ============================================
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: comfortablemove_backend_dev
+    env_file:
+      - .env.dev
+    volumes:
+      - ./app:/app/app:cached
+    command: >
+      python -m uvicorn app.main:app
+      --host 0.0.0.0
+      --port 8000
+      --reload
+      --reload-dir /app/app
+      --log-level debug
+    environment:
+      - ENVIRONMENT=development
+      - DEBUG=true
+      - DB_ECHO=true
+    healthcheck:
+      start_period: 5s
+
+  postgres:
+    container_name: comfortablemove_db_dev
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-dev_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-comfortablemove_dev}
+
+  redis:
+    container_name: comfortablemove_redis_dev
+    command: redis-server --appendonly no --maxmemory 64mb --maxmemory-policy allkeys-lru
