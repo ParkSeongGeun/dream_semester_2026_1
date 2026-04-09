@@ -2,3 +2,7 @@
 
 .claude/
 .omc/
+
+# AWS 민감 파일
+*.pem
+*-outputs.env
