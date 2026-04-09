@@ -1,0 +1,75 @@
+name: CD - Deploy to EC2
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  EC2_USER: ec2-user
+  PROJECT_DIR: /home/ec2-user/comfortablemove
+  DOCKER_IMAGE: comfortablemove-backend
+
+jobs:
+  deploy:
+    name: Deploy to EC2
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "${SSH_PRIVATE_KEY}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${EC2_HOST}" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Deploy to EC2
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            ${EC2_USER}@${EC2_HOST} << 'DEPLOY_SCRIPT'
+
+            set -euo pipefail
+            cd ${PROJECT_DIR}
+
+            echo "=== Pulling latest code ==="
+            git pull origin main
+
+            echo "=== Building and deploying ==="
+            cd backend
+            docker compose build --no-cache backend
+            docker compose up -d
+
+            echo "=== Waiting for health check ==="
+            for i in $(seq 1 30); do
+              if curl -sf http://localhost:8000/api/v1/health > /dev/null 2>&1; then
+                echo "Health check passed!"
+                docker compose ps
+                exit 0
+              fi
+              echo "Waiting... ($i/30)"
+              sleep 2
+            done
+
+            echo "Health check failed!"
+            docker compose logs --tail=50 backend
+            exit 1
+
+          DEPLOY_SCRIPT
+
+      - name: Cleanup SSH
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
