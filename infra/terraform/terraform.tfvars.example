@@ -1,0 +1,28 @@
+# =============================================================
+# ComfortableMove - Terraform 변수 설정
+# =============================================================
+# 이 파일을 terraform.tfvars로 복사하고 실제 값을 입력하세요.
+#   cp terraform.tfvars.example terraform.tfvars
+#
+# ⚠️ terraform.tfvars는 .gitignore에 등록되어 있습니다.
+#    절대 Git에 커밋하지 마세요!
+# =============================================================
+
+# --- AWS 자격증명 ---
+aws_access_key = "YOUR_ACCESS_KEY_ID"
+aws_secret_key = "YOUR_SECRET_ACCESS_KEY"
+
+# --- 내 IP (SSH 접근 허용용) ---
+# https://checkip.amazonaws.com 에서 확인
+my_ip = "YOUR_IP/32"
+
+# --- RDS 비밀번호 ---
+db_password = "CHANGE_ME_min_8_chars"
+
+# --- Budget 알림 이메일 ---
+notification_email = "your@email.com"
+
+# --- 선택 사항 (기본값 사용 시 생략 가능) ---
+# enable_nat_gateway = false    # true 시 시간당 $0.059 과금
+# db_multi_az        = false    # true 시 프리티어 초과
+# s3_bucket_name     = "comfortablemove-assets"  # 전역 고유해야 함
