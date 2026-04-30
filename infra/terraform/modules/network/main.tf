@@ -1,6 +1,26 @@
 # =============================================================
 # Network Module - VPC, Subnets, IGW, NAT GW, Route Tables
 # =============================================================
+# locals: 공통 태그/이름 계산
+# for_each: 가용영역 키로 서브넷 생성 (인덱스 변경에 안전)
+# =============================================================
+
+locals {
+  # 가용영역을 키로 하는 서브넷 매핑
+  public_subnets = {
+    for i, az in var.availability_zones : az => {
+      cidr = var.public_subnet_cidrs[i]
+      name = "${var.project_name}-public-${az}"
+    }
+  }
+
+  private_subnets = {
+    for i, az in var.availability_zones : az => {
+      cidr = var.private_subnet_cidrs[i]
+      name = "${var.project_name}-private-${az}"
+    }
+  }
+}
 
 # --- VPC ---
 resource "aws_vpc" "main" {
@@ -18,25 +38,27 @@ resource "aws_internet_gateway" "main" {
   tags = { Name = "${var.project_name}-igw" }
 }
 
-# --- Public Subnets ---
+# --- Public Subnets (for_each) ---
 resource "aws_subnet" "public" {
-  count                   = length(var.public_subnet_cidrs)
+  for_each = local.public_subnets
+
   vpc_id                  = aws_vpc.main.id
-  cidr_block              = var.public_subnet_cidrs[count.index]
-  availability_zone       = var.availability_zones[count.index]
+  cidr_block              = each.value.cidr
+  availability_zone       = each.key
   map_public_ip_on_launch = true
 
-  tags = { Name = "${var.project_name}-public-${var.availability_zones[count.index]}" }
+  tags = { Name = each.value.name }
 }
 
-# --- Private Subnets ---
+# --- Private Subnets (for_each) ---
 resource "aws_subnet" "private" {
-  count             = length(var.private_subnet_cidrs)
-  vpc_id            = aws_vpc.main.id
-  cidr_block        = var.private_subnet_cidrs[count.index]
-  availability_zone = var.availability_zones[count.index]
+  for_each = local.private_subnets
 
-  tags = { Name = "${var.project_name}-private-${var.availability_zones[count.index]}" }
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = each.value.cidr
+  availability_zone = each.key
+
+  tags = { Name = each.value.name }
 }
 
 # --- Public Route Table ---
@@ -52,12 +74,13 @@ resource "aws_route_table" "public" {
 }
 
 resource "aws_route_table_association" "public" {
-  count          = length(aws_subnet.public)
-  subnet_id      = aws_subnet.public[count.index].id
+  for_each = aws_subnet.public
+
+  subnet_id      = each.value.id
   route_table_id = aws_route_table.public.id
 }
 
-# --- NAT Gateway (optional) ---
+# --- NAT Gateway (선택적) ---
 resource "aws_eip" "nat" {
   count  = var.enable_nat_gateway ? 1 : 0
   domain = "vpc"
@@ -68,7 +91,7 @@ resource "aws_eip" "nat" {
 resource "aws_nat_gateway" "main" {
   count         = var.enable_nat_gateway ? 1 : 0
   allocation_id = aws_eip.nat[0].id
-  subnet_id     = aws_subnet.public[0].id
+  subnet_id     = values(aws_subnet.public)[0].id
 
   tags = { Name = "${var.project_name}-nat-gw" }
 }
@@ -88,7 +111,8 @@ resource "aws_route" "private_nat" {
 }
 
 resource "aws_route_table_association" "private" {
-  count          = length(aws_subnet.private)
-  subnet_id      = aws_subnet.private[count.index].id
+  for_each = aws_subnet.private
+
+  subnet_id      = each.value.id
   route_table_id = aws_route_table.private.id
 }

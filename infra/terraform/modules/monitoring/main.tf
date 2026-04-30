@@ -176,11 +176,11 @@ resource "aws_cloudwatch_dashboard" "main" {
         width  = 12
         height = 6
         properties = {
-          title = "ALB Response Time"
+          title   = "ALB Response Time"
           metrics = [["AWS/ApplicationELB", "TargetResponseTime", "LoadBalancer", var.alb_arn_suffix]]
-          period = 300
-          region = var.aws_region
-          stat   = "Average"
+          period  = 300
+          region  = var.aws_region
+          stat    = "Average"
         }
       },
       {
@@ -190,11 +190,11 @@ resource "aws_cloudwatch_dashboard" "main" {
         width  = 12
         height = 6
         properties = {
-          title = "RDS Free Storage Space"
+          title   = "RDS Free Storage Space"
           metrics = [["AWS/RDS", "FreeStorageSpace", "DBInstanceIdentifier", var.db_instance_id]]
-          period = 300
-          region = var.aws_region
-          stat   = "Average"
+          period  = 300
+          region  = var.aws_region
+          stat    = "Average"
         }
       }
     ]
@@ -210,37 +210,37 @@ resource "aws_budgets_budget" "monthly" {
 
   # 50% 실제 사용
   notification {
-    comparison_operator       = "GREATER_THAN"
-    threshold                 = 50
-    threshold_type            = "PERCENTAGE"
-    notification_type         = "ACTUAL"
+    comparison_operator        = "GREATER_THAN"
+    threshold                  = 50
+    threshold_type             = "PERCENTAGE"
+    notification_type          = "ACTUAL"
     subscriber_email_addresses = [var.notification_email]
   }
 
   # 80% 실제 사용
   notification {
-    comparison_operator       = "GREATER_THAN"
-    threshold                 = 80
-    threshold_type            = "PERCENTAGE"
-    notification_type         = "ACTUAL"
+    comparison_operator        = "GREATER_THAN"
+    threshold                  = 80
+    threshold_type             = "PERCENTAGE"
+    notification_type          = "ACTUAL"
     subscriber_email_addresses = [var.notification_email]
   }
 
   # 100% 실제 사용
   notification {
-    comparison_operator       = "GREATER_THAN"
-    threshold                 = 100
-    threshold_type            = "PERCENTAGE"
-    notification_type         = "ACTUAL"
+    comparison_operator        = "GREATER_THAN"
+    threshold                  = 100
+    threshold_type             = "PERCENTAGE"
+    notification_type          = "ACTUAL"
     subscriber_email_addresses = [var.notification_email]
   }
 
   # 100% 예측
   notification {
-    comparison_operator       = "GREATER_THAN"
-    threshold                 = 100
-    threshold_type            = "PERCENTAGE"
-    notification_type         = "FORECASTED"
+    comparison_operator        = "GREATER_THAN"
+    threshold                  = 100
+    threshold_type             = "PERCENTAGE"
+    notification_type          = "FORECASTED"
     subscriber_email_addresses = [var.notification_email]
   }
 }

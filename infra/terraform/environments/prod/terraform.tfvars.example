@@ -1,0 +1,18 @@
+# =============================================================
+# PROD Environment - tfvars Example
+# =============================================================
+
+aws_access_key     = "YOUR_AWS_ACCESS_KEY"
+aws_secret_key     = "YOUR_AWS_SECRET_KEY"
+
+my_ip              = "1.2.3.4/32"
+db_password        = "CHANGE_ME_STRONG_PASSWORD"
+notification_email = "your-email@example.com"
+
+# 선택적 오버라이드
+# ec2_instance_type = "t3.small"
+# db_instance_class = "db.t3.small"
+# db_multi_az       = false       # 비용 고려시 Single-AZ
+# enable_nat_gateway = false      # 비용 고려시 비활성
+# domain_name       = "comfortablemove.com"
+# budget_limit      = "30.0"
