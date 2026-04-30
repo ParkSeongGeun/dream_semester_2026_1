@@ -1,8 +1,12 @@
 """
-버스 도착 정보 API
+버스 도착 정보 / 정류소 조회 API
 
-서울시 버스 API를 프록시하여 실시간 도착 정보를 제공합니다.
-Redis 캐싱을 통해 응답 속도를 개선합니다.
+iOS 프론트엔드(ComfortableMove) 모델과 동일한 응답 구조로 서울시 버스 API 를
+프록시. 응답은 `{msgHeader, msgBody.itemList[...]}` 형식.
+
+Endpoints:
+  - GET /api/v1/bus/arrivals?ars_id=XXXXX     (iOS getStationByUid 대체)
+  - GET /api/v1/bus/stations?tmX=&tmY=&radius=  (iOS getStationByPos 대체)
 """
 
 from datetime import datetime, timedelta, timezone
@@ -11,7 +15,11 @@ from fastapi import APIRouter, HTTPException, Query, status
 
 from app.core.config import settings
 from app.core.redis import get_cache, set_cache
-from app.schemas.bus import BusArrivalResponse, ErrorResponse
+from app.schemas.bus import (
+    BusArrivalResponse,
+    ErrorResponse,
+    StationByPosResponse,
+)
 from app.services.seoul_bus_api import seoul_bus_service
 
 router = APIRouter(prefix="/bus", tags=["Bus"])
@@ -20,55 +28,32 @@ router = APIRouter(prefix="/bus", tags=["Bus"])
 @router.get(
     "/arrivals",
     response_model=BusArrivalResponse,
-    summary="버스 도착 정보 조회",
-    description="특정 정류장의 실시간 버스 도착 정보를 조회합니다. Redis 캐싱 적용 (TTL: 60초)",
-    responses={
-        404: {"model": ErrorResponse, "description": "버스 정보 없음"},
-        503: {"model": ErrorResponse, "description": "Seoul Bus API 장애"},
-    },
+    summary="버스 도착 정보 조회 (iOS 호환)",
+    description=(
+        "iOS BusArrivalResponse 와 동일한 `{msgHeader, msgBody.itemList[]}` 구조로 응답. "
+        "Redis 캐시 TTL 적용."
+    ),
+    responses={503: {"model": ErrorResponse, "description": "Seoul Bus API 장애"}},
 )
 async def get_bus_arrivals(
     ars_id: str = Query(
         ...,
-        description="정류장 고유번호",
-        example="01234",
-        min_length=5,
-        max_length=5,
+        description="정류장 고유번호 (서울 표준 5자리)",
+        min_length=4,
+        max_length=6,
+        examples=["01234"],
     )
 ):
-    """
-    버스 도착 정보 조회
-
-    Args:
-        ars_id: 정류장 고유번호 (5자리)
-
-    Returns:
-        BusArrivalResponse: 버스 도착 정보
-
-    Raises:
-        HTTPException 404: 버스 정보 없음
-        HTTPException 503: Seoul Bus API 장애
-    """
+    """버스 도착 정보 조회 — iOS 모델과 1:1 호환"""
     cache_key = f"arrivals:{ars_id}"
-    now = datetime.now(timezone.utc)
 
-    # 1. 캐시 확인
     cached_data = await get_cache(cache_key)
     if cached_data:
-        # 캐시 히트
-        return BusArrivalResponse(
-            ars_id=ars_id,
-            station_name=cached_data.get("station_name", ""),
-            arrivals=cached_data.get("arrivals", []),
-            cached=True,
-            cached_at=datetime.fromisoformat(cached_data.get("cached_at")),
-            expires_at=datetime.fromisoformat(cached_data.get("expires_at")),
-        )
+        return BusArrivalResponse.model_validate(cached_data)
 
-    # 2. 캐시 미스 - Seoul API 호출
     try:
         raw_data = await seoul_bus_service.get_station_arrival_info(ars_id)
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail={
@@ -78,45 +63,62 @@ async def get_bus_arrivals(
             },
         )
 
-    # 3. 응답 파싱
-    msg_header = raw_data.get("msgHeader", {})
-    header_code = msg_header.get("headerCd", "")
+    normalized = seoul_bus_service.normalize_arrival_response(raw_data)
 
-    if header_code != "0":
-        # 데이터 없음
+    # iOS는 headerCd != "0" 일 때 자체적으로 처리 (noBusInfo 등)
+    # → 백엔드는 200 으로 그대로 통과시켜 클라이언트가 헤더로 분기 가능하게 함
+    await set_cache(
+        cache_key,
+        normalized,
+        ttl=settings.redis_ttl_bus_arrival,
+    )
+
+    return BusArrivalResponse.model_validate(normalized)
+
+
+@router.get(
+    "/stations",
+    response_model=StationByPosResponse,
+    summary="위치 기반 정류소 조회 (iOS 호환)",
+    description=(
+        "iOS StationByPosResponse 와 동일한 응답 구조. "
+        "tmX=경도, tmY=위도, radius=반경(m) — iOS BusStopService 와 동일한 파라미터."
+    ),
+    responses={503: {"model": ErrorResponse, "description": "Seoul Bus API 장애"}},
+)
+async def get_nearby_stations(
+    tmX: float = Query(..., description="경도 (longitude)", examples=[126.9707]),
+    tmY: float = Query(..., description="위도 (latitude)", examples=[37.5547]),
+    radius: int = Query(default=100, ge=1, le=2000, description="반경(m)"),
+):
+    """위치 기반 정류소 조회 — iOS StationByPosResponse 와 1:1 호환"""
+    # 정류소 조회는 좌표가 키이므로 캐시 키도 좌표 기반
+    cache_key = f"stations:{round(tmY, 5)}:{round(tmX, 5)}:{radius}"
+
+    cached_data = await get_cache(cache_key)
+    if cached_data:
+        return StationByPosResponse.model_validate(cached_data)
+
+    try:
+        raw_data = await seoul_bus_service.get_stations_by_position(
+            latitude=tmY, longitude=tmX, radius=radius
+        )
+    except Exception:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail={
-                "detail": "No bus information found for this station",
-                "error_code": "NO_BUS_INFO",
-                "ars_id": ars_id,
+                "detail": "Seoul Bus API is currently unavailable",
+                "error_code": "EXTERNAL_API_ERROR",
+                "retry_after": 60,
             },
         )
 
-    # 4. 데이터 정제
-    arrivals = seoul_bus_service.parse_arrival_info(raw_data)
+    normalized = seoul_bus_service.normalize_station_response(raw_data)
 
-    # 정류장 이름 추출
-    station_name = ""
-    if arrivals:
-        station_name = arrivals[0].get("direction", "")
-
-    # 5. Redis에 캐싱
-    expires_at = now + timedelta(seconds=settings.redis_ttl_bus_arrival)
-    cache_data = {
-        "station_name": station_name,
-        "arrivals": arrivals,
-        "cached_at": now.isoformat(),
-        "expires_at": expires_at.isoformat(),
-    }
-    await set_cache(cache_key, cache_data, ttl=settings.redis_ttl_bus_arrival)
-
-    # 6. 응답 반환
-    return BusArrivalResponse(
-        ars_id=ars_id,
-        station_name=station_name,
-        arrivals=arrivals,
-        cached=False,
-        cached_at=now,
-        expires_at=expires_at,
+    await set_cache(
+        cache_key,
+        normalized,
+        ttl=settings.redis_ttl_bus_arrival,
     )
+
+    return StationByPosResponse.model_validate(normalized)

@@ -1,147 +1,175 @@
 """
 Seoul Bus API Service 단위 테스트
 
-서울시 버스 API 서비스의 파싱 로직을 테스트합니다.
+iOS 프론트엔드(ComfortableMove) 호환 응답 정규화 로직 검증.
+응답 필드명은 iOS 모델(BusArrivalItem, StationItem) 과 동일하게 유지되어야 함.
 """
 
-import pytest
 from app.services.seoul_bus_api import SeoulBusAPIService
 
 
-class TestSeoulBusAPIService:
-    """Seoul Bus API Service 테스트"""
+class TestNormalizeArrivalResponse:
+    """도착정보 응답 정규화 — iOS BusArrivalResponse 형식 호환"""
 
     def setup_method(self):
-        """각 테스트 전 실행"""
         self.service = SeoulBusAPIService()
 
-    def test_parse_bus_route_type_gangseon(self):
-        """버스 노선 유형 파싱 - 간선"""
-        result = self.service.parse_bus_route_type("3")
-        assert result == "간선"
-
-    def test_parse_bus_route_type_jiseon(self):
-        """버스 노선 유형 파싱 - 지선"""
-        result = self.service.parse_bus_route_type("4")
-        assert result == "지선"
-
-    def test_parse_bus_route_type_gongHang(self):
-        """버스 노선 유형 파싱 - 공항"""
-        result = self.service.parse_bus_route_type("1")
-        assert result == "공항"
-
-    def test_parse_bus_route_type_maeul(self):
-        """버스 노선 유형 파싱 - 마을"""
-        result = self.service.parse_bus_route_type("2")
-        assert result == "마을"
-
-    def test_parse_bus_route_type_gwangyeok(self):
-        """버스 노선 유형 파싱 - 광역"""
-        result = self.service.parse_bus_route_type("6")
-        assert result == "광역"
-
-    def test_parse_bus_route_type_unknown(self):
-        """버스 노선 유형 파싱 - 알 수 없음"""
-        result = self.service.parse_bus_route_type("9")
-        assert result == "기타"
-
-    def test_parse_congestion_empty(self):
-        """혼잡도 파싱 - 여유"""
-        result = self.service.parse_congestion("3")
-        assert result == "empty"
-
-    def test_parse_congestion_normal(self):
-        """혼잡도 파싱 - 보통"""
-        result = self.service.parse_congestion("4")
-        assert result == "normal"
-
-    def test_parse_congestion_crowded(self):
-        """혼잡도 파싱 - 혼잡"""
-        result = self.service.parse_congestion("5")
-        assert result == "crowded"
-
-    def test_parse_congestion_unknown(self):
-        """혼잡도 파싱 - 알 수 없음"""
-        result = self.service.parse_congestion("0")
-        assert result == "unknown"
-
-    def test_parse_arrival_info_success(self, mock_seoul_api_success):
-        """버스 도착 정보 파싱 - 성공"""
-        result = self.service.parse_arrival_info(mock_seoul_api_success)
-
-        assert len(result) == 2
-
-        # 첫 번째 버스
-        assert result[0]["route_name"] == "721"
-        assert result[0]["route_type"] == "간선"
-        assert result[0]["arrival_message"] == "2분후[2번째 전]"
-        assert result[0]["congestion"] == "empty"
-        assert result[0]["is_full"] is False
-        assert result[0]["is_last_bus"] is False
-
-        # 두 번째 버스
-        assert result[1]["route_name"] == "2012"
-        assert result[1]["route_type"] == "지선"
-        assert result[1]["arrival_message"] == "5분후[5번째 전]"
-        assert result[1]["congestion"] == "normal"
-
-    def test_parse_arrival_info_no_data(self, mock_seoul_api_no_data):
-        """버스 도착 정보 파싱 - 데이터 없음"""
-        result = self.service.parse_arrival_info(mock_seoul_api_no_data)
-        assert len(result) == 0
-
-    def test_parse_arrival_info_empty_itemlist(self):
-        """버스 도착 정보 파싱 - 빈 itemList"""
-        mock_data = {
-            "msgHeader": {"headerCd": "0"},
-            "msgBody": {"itemList": []},
+    def test_normalize_basic_list(self):
+        raw = {
+            "msgHeader": {"headerCd": "0", "headerMsg": "정상", "itemCount": "1"},
+            "msgBody": {
+                "itemList": [
+                    {
+                        "rtNm": "721",
+                        "arrmsg1": "2분후[2번째 전]",
+                        "adirection": "신설동",
+                        "routeType": "3",
+                        "isFullFlag1": "0",
+                        "isLast1": "0",
+                        "congestion1": "3",
+                    }
+                ]
+            },
         }
-        result = self.service.parse_arrival_info(mock_data)
-        assert len(result) == 0
+        out = self.service.normalize_arrival_response(raw)
+        assert out["msgHeader"]["headerCd"] == "0"
+        assert out["msgHeader"]["itemCount"] == 1  # int 로 변환
+        assert len(out["msgBody"]["itemList"]) == 1
+        item = out["msgBody"]["itemList"][0]
+        assert item["rtNm"] == "721"
+        assert item["arrmsg1"] == "2분후[2번째 전]"
+        assert item["adirection"] == "신설동"
+        assert item["routeType"] == "3"
+        assert item["congestion1"] == "3"
 
-    def test_parse_arrival_info_single_item(self):
-        """버스 도착 정보 파싱 - 단일 항목 (dict)"""
-        mock_data = {
-            "msgHeader": {"headerCd": "0"},
+    def test_normalize_dict_itemlist_to_list(self):
+        """단일 항목이 dict 로 오는 경우 list 로 변환"""
+        raw = {
+            "msgHeader": {"headerCd": "0", "headerMsg": "정상", "itemCount": 1},
             "msgBody": {
                 "itemList": {
                     "rtNm": "721",
-                    "busRouteType": "3",
                     "arrmsg1": "곧 도착",
-                    "stNm": "신설동",
-                    "congestion": "3",
-                    "full1": "0",
-                    "mkTm": "0",
+                    "routeType": "3",
                 }
             },
         }
-        result = self.service.parse_arrival_info(mock_data)
-        assert len(result) == 1
-        assert result[0]["route_name"] == "721"
+        out = self.service.normalize_arrival_response(raw)
+        assert isinstance(out["msgBody"]["itemList"], list)
+        assert out["msgBody"]["itemList"][0]["rtNm"] == "721"
+
+    def test_normalize_none_itemlist_becomes_empty(self):
+        raw = {
+            "msgHeader": {"headerCd": "4", "headerMsg": "결과가 없습니다.", "itemCount": 0},
+            "msgBody": {"itemList": None},
+        }
+        out = self.service.normalize_arrival_response(raw)
+        assert out["msgBody"]["itemList"] == []
+
+    def test_normalize_missing_msgbody(self):
+        raw = {"msgHeader": {"headerCd": "0", "headerMsg": "정상", "itemCount": 0}}
+        out = self.service.normalize_arrival_response(raw)
+        assert out["msgBody"]["itemList"] == []
+
+    def test_congestion_falls_back_to_congestion_field(self):
+        """congestion1 미존재 시 congestion 필드를 폴백으로 사용"""
+        raw = {
+            "msgHeader": {"headerCd": "0", "headerMsg": "정상", "itemCount": 1},
+            "msgBody": {
+                "itemList": [
+                    {"rtNm": "721", "routeType": "3", "congestion": "5"}
+                ]
+            },
+        }
+        out = self.service.normalize_arrival_response(raw)
+        assert out["msgBody"]["itemList"][0]["congestion1"] == "5"
+
+    def test_normalize_keeps_ios_field_names(self):
+        """iOS 모델 필드명만 응답에 노출되어야 함 (한글 변환 없음)"""
+        raw = {
+            "msgHeader": {"headerCd": "0", "headerMsg": "정상", "itemCount": 1},
+            "msgBody": {
+                "itemList": [
+                    {
+                        "rtNm": "721",
+                        "arrmsg1": "2분후",
+                        "adirection": "강남",
+                        "routeType": "3",
+                        "isFullFlag1": "1",
+                        "isLast1": "0",
+                        "congestion1": "4",
+                    }
+                ]
+            },
+        }
+        out = self.service.normalize_arrival_response(raw)
+        item = out["msgBody"]["itemList"][0]
+        # 원본 키만 유지, 변환된 키는 없음
+        assert set(item.keys()) == {
+            "rtNm", "arrmsg1", "adirection", "routeType",
+            "isFullFlag1", "isLast1", "congestion1",
+        }
 
 
-class TestSeoulBusAPIServiceValidation:
-    """Seoul Bus API Service 입력 검증 테스트"""
+class TestNormalizeStationResponse:
+    """정류소 조회 응답 정규화 — iOS StationByPosResponse 형식 호환"""
 
     def setup_method(self):
         self.service = SeoulBusAPIService()
 
-    def test_parse_bus_route_type_with_none(self):
-        """None 값 처리"""
-        result = self.service.parse_bus_route_type(None)
-        assert result == "기타"
+    def test_normalize_station_basic(self):
+        raw = {
+            "msgHeader": {"headerCd": "0", "headerMsg": "정상", "itemCount": 1},
+            "msgBody": {
+                "itemList": [
+                    {
+                        "stationId": "100000001",
+                        "stationNm": "서울역",
+                        "arsId": "02001",
+                        "gpsX": "126.9707",
+                        "gpsY": "37.5547",
+                        "dist": "42",
+                        "stationTp": "0",
+                    }
+                ]
+            },
+        }
+        out = self.service.normalize_station_response(raw)
+        assert out["msgHeader"]["itemCount"] == 1
+        item = out["msgBody"]["itemList"][0]
+        assert item["stationId"] == "100000001"
+        assert item["stationNm"] == "서울역"
+        assert item["arsId"] == "02001"
+        assert item["gpsX"] == "126.9707"
+        assert item["gpsY"] == "37.5547"
 
-    def test_parse_bus_route_type_with_empty_string(self):
-        """빈 문자열 처리"""
-        result = self.service.parse_bus_route_type("")
-        assert result == "기타"
+    def test_normalize_station_empty(self):
+        raw = {
+            "msgHeader": {"headerCd": "4", "headerMsg": "결과가 없습니다.", "itemCount": 0},
+            "msgBody": {"itemList": None},
+        }
+        out = self.service.normalize_station_response(raw)
+        assert out["msgBody"]["itemList"] == []
 
-    def test_parse_congestion_with_none(self):
-        """None 값 처리"""
-        result = self.service.parse_congestion(None)
-        assert result == "unknown"
-
-    def test_parse_congestion_with_empty_string(self):
-        """빈 문자열 처리"""
-        result = self.service.parse_congestion("")
-        assert result == "unknown"
+    def test_normalize_station_keeps_ios_field_names(self):
+        raw = {
+            "msgHeader": {"headerCd": "0", "headerMsg": "정상", "itemCount": 1},
+            "msgBody": {
+                "itemList": [
+                    {
+                        "stationId": "1",
+                        "stationNm": "테스트",
+                        "arsId": "00001",
+                        "gpsX": "126.0",
+                        "gpsY": "37.0",
+                        "dist": "10",
+                        "stationTp": "0",
+                    }
+                ]
+            },
+        }
+        out = self.service.normalize_station_response(raw)
+        item = out["msgBody"]["itemList"][0]
+        assert set(item.keys()) == {
+            "stationId", "stationNm", "arsId", "gpsX", "gpsY", "dist", "stationTp",
+        }

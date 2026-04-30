@@ -5,7 +5,14 @@ API 요청/응답 검증을 위한 스키마
 """
 
 from app.schemas.boarding import BoardingRecordRequest, BoardingRecordResponse
-from app.schemas.bus import BusArrivalInfo, BusArrivalResponse, ErrorResponse
+from app.schemas.bus import (
+    BusArrivalItem,
+    BusArrivalResponse,
+    ErrorResponse,
+    MsgHeader,
+    StationByPosResponse,
+    StationItem,
+)
 from app.schemas.health import HealthCheckResponse, ServiceStatus
 from app.schemas.statistics import (
     ActivityByDayOfWeek,
@@ -21,9 +28,12 @@ __all__ = [
     # Health
     "HealthCheckResponse",
     "ServiceStatus",
-    # Bus
-    "BusArrivalInfo",
+    # Bus (iOS-compatible)
+    "MsgHeader",
+    "BusArrivalItem",
     "BusArrivalResponse",
+    "StationItem",
+    "StationByPosResponse",
     "ErrorResponse",
     # Boarding
     "BoardingRecordRequest",
