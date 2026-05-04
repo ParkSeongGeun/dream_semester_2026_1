@@ -1,0 +1,20 @@
+# 백엔드 Service — 클러스터 내부에서 backend.comfortablemove.svc.cluster.local:80 으로 접근.
+# 로컬 외부 접근은 `kubectl port-forward svc/backend 8000:80 -n comfortablemove` 또는
+# `minikube service backend -n comfortablemove --url` 사용.
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: comfortablemove
+  labels:
+    app.kubernetes.io/name: backend
+    app.kubernetes.io/part-of: comfortablemove
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: backend
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP

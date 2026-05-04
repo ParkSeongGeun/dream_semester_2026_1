@@ -1,0 +1,75 @@
+# 백엔드 API Deployment — replicas=3 (10주차 목표)
+# 이미지는 로컬 빌드 후 `minikube image load comfortablemove-backend:dev` 로 로드.
+# (imagePullPolicy=IfNotPresent 로 외부 레지스트리 pull 시도하지 않음)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: comfortablemove
+  labels:
+    app.kubernetes.io/name: backend
+    app.kubernetes.io/part-of: comfortablemove
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: backend
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: backend
+        app.kubernetes.io/part-of: comfortablemove
+    spec:
+      # `host.minikube.internal` 은 minikube 노드의 /etc/hosts 에만 있고 Pod DNS 에는
+      # 없으므로 hostAliases 로 직접 매핑한다. 192.168.65.254 = minikube docker driver
+      # 의 host gateway. 호스트 머신의 docker-compose 로 띄운 postgres/redis 에 도달.
+      hostAliases:
+        - ip: "192.168.65.254"
+          hostnames:
+            - "host.minikube.internal"
+      containers:
+        - name: backend
+          image: comfortablemove-backend:dev
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          # ConfigMap + Secret 의 모든 키를 환경변수로 주입.
+          # Pydantic Settings 가 동일 이름으로 로드.
+          envFrom:
+            - configMapRef:
+                name: backend-config
+            - secretRef:
+                name: backend-secret
+          # Liveness: 프로세스 살아있나? — 503 도 살아있다고 보고, 컨테이너 재시작은
+          #          별도 조건(/health 응답 자체가 끊긴 경우)에서만.
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
+          # Readiness: 의존성(DB/Redis/외부 API) 모두 OK 일 때만 트래픽 받음.
+          readinessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
