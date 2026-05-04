@@ -1,0 +1,3 @@
+# 실제 값이 든 Secret 매니페스트는 커밋 금지.
+# 템플릿(secret.example.yaml)만 커밋됨.
+secret.yaml
