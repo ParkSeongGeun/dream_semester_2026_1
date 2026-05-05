@@ -3,8 +3,14 @@ name: CD - Deploy to EC2
 on:
   push:
     branches: [main]
+    # 실제 배포 대상이 바뀐 경우에만 트리거 (문서/매니페스트/테스트 단독 변경은 제외).
     paths:
-      - 'backend/**'
+      - 'backend/app/**'
+      - 'backend/Dockerfile'
+      - 'backend/requirements*.txt'
+      - 'backend/docker-compose.yml'
+      - 'backend/docker-compose.prod.yml'
+      - '.github/workflows/cd.yml'
 
 concurrency:
   group: deploy-production
@@ -22,10 +28,27 @@ jobs:
     if: github.ref == 'refs/heads/main'
 
     steps:
+      # 시크릿 미등록 시 워크플로를 실패시키지 않고 워닝 후 정상 종료한다.
+      # (EC2_SSH_PRIVATE_KEY / EC2_HOST 둘 다 등록되어야 실제 배포 진행)
+      - name: Check deployment secrets
+        id: secrets
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+        run: |
+          if [ -z "${SSH_PRIVATE_KEY}" ] || [ -z "${EC2_HOST}" ]; then
+            echo "::warning::EC2 deploy secrets (EC2_SSH_PRIVATE_KEY, EC2_HOST) not configured — skipping deployment."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Checkout
+        if: steps.secrets.outputs.skip == 'false'
         uses: actions/checkout@v4
 
       - name: Configure SSH
+        if: steps.secrets.outputs.skip == 'false'
         env:
           SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
           EC2_HOST: ${{ secrets.EC2_HOST }}
@@ -36,6 +59,7 @@ jobs:
           ssh-keyscan -H "${EC2_HOST}" >> ~/.ssh/known_hosts 2>/dev/null
 
       - name: Deploy to EC2
+        if: steps.secrets.outputs.skip == 'false'
         env:
           EC2_HOST: ${{ secrets.EC2_HOST }}
         run: |
