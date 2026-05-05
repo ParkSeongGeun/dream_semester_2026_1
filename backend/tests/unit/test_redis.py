@@ -234,15 +234,23 @@ class TestRedisCacheOperations:
         """패턴 캐시 삭제 - 성공"""
         import app.core.redis as redis_module
 
+        # production 은 scan_iter (async generator) 를 사용하므로
+        # 동일하게 async generator 로 모킹한다.
+        async def fake_scan_iter(match, count):
+            for k in ["bus:01234", "bus:56789"]:
+                yield k
+
         mock_client = AsyncMock()
-        mock_client.keys.return_value = ["bus:01234", "bus:56789"]
+        mock_client.scan_iter = fake_scan_iter
         original = redis_module.redis_client
         redis_module.redis_client = mock_client
 
         result = await clear_cache_pattern("bus:*")
 
         assert result == 2
-        mock_client.delete.assert_called_once_with("bus:01234", "bus:56789")
+        assert mock_client.delete.call_count == 2
+        mock_client.delete.assert_any_call("bus:01234")
+        mock_client.delete.assert_any_call("bus:56789")
 
         redis_module.redis_client = original
 
@@ -250,14 +258,19 @@ class TestRedisCacheOperations:
         """패턴 캐시 삭제 - 일치하는 키 없음"""
         import app.core.redis as redis_module
 
+        async def empty_scan_iter(match, count):
+            return
+            yield  # 빈 async generator
+
         mock_client = AsyncMock()
-        mock_client.keys.return_value = []
+        mock_client.scan_iter = empty_scan_iter
         original = redis_module.redis_client
         redis_module.redis_client = mock_client
 
         result = await clear_cache_pattern("nonexistent:*")
 
         assert result == 0
+        mock_client.delete.assert_not_called()
 
         redis_module.redis_client = original
 

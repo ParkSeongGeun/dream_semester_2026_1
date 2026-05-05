@@ -5,6 +5,13 @@ Pytest Configuration and Fixtures
 """
 
 import os
+
+# `app.main` import 시점에 `Settings()` 가 즉시 평가되므로,
+# CI 환경(ENVIRONMENT=testing 등)에서 Literal 검증이 깨지지 않도록 import 전에 보정.
+os.environ.setdefault("ENVIRONMENT", "development")
+os.environ.setdefault("SEOUL_BUS_API_KEY", "test_key")
+os.environ.setdefault("SECRET_KEY", "test-secret-key")
+
 import pytest
 import pytest_asyncio
 import asyncio

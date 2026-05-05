@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     app_name: str = Field(default="ComfortableMove Backend", alias="APP_NAME")
     app_version: str = Field(default="1.0.0", alias="APP_VERSION")
     debug: bool = Field(default=False, alias="DEBUG")
-    environment: Literal["development", "staging", "production"] = Field(
+    environment: Literal["development", "staging", "production", "testing"] = Field(
         default="development", alias="ENVIRONMENT"
     )
 
