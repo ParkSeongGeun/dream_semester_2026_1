@@ -20,6 +20,7 @@
   pytest==7.4.4
   pytest-asyncio==0.23.3
   pytest-cov==4.1.0
+  aiosqlite==0.19.0  # tests/conftest.py 의 sqlite+aiosqlite 인메모리 DB 용
 
   # Utilities
   python-dotenv==1.0.0
