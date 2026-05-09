@@ -9,7 +9,9 @@ metadata:
     app.kubernetes.io/name: backend
     app.kubernetes.io/part-of: comfortablemove
 data:
-  ENVIRONMENT: "production"
+  # 학습용 minikube 환경 — DB schema 자동 생성을 위해 development 로 둔다.
+  # 실제 운영 환경에서는 production 으로 두고 Alembic 마이그레이션을 사용한다.
+  ENVIRONMENT: "development"
   DEBUG: "false"
   HOST: "0.0.0.0"
   PORT: "8000"

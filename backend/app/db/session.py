@@ -75,14 +75,17 @@ async def init_db() -> None:
     """
     데이터베이스 초기화
 
-    테이블 생성 (개발 환경에서만 사용)
+    테이블 생성 (개발/테스트 환경에서만 사용)
     프로덕션에서는 Alembic 마이그레이션 사용
     """
     from app.models.base import Base
+    # 모델 모듈을 import 해야 SQLAlchemy Base.metadata 에 테이블이 등록된다.
+    # (이 라인이 빠지면 metadata 가 비어 create_all 이 아무 효과 없음)
+    from app.models import user_device, boarding_record  # noqa: F401
 
     async with engine.begin() as conn:
-        # 개발 환경에서만 테이블 자동 생성
-        if settings.debug:
+        # 학습용 로컬 환경에서는 항상 자동 생성. production 은 Alembic 으로 관리.
+        if settings.environment in ("development", "testing"):
             await conn.run_sync(Base.metadata.create_all)
 
 
