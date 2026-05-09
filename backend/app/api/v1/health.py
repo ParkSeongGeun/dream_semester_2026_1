@@ -91,6 +91,38 @@ async def health_check():
 
 
 @router.get(
+    "/health/ready",
+    summary="Readiness 체크 (K8s 용)",
+    description=(
+        "K8s readinessProbe 전용 — 외부 API(서울 TOPIS) 는 검사하지 않고 "
+        "DB·Redis 만 확인한다. /api/v1/health 는 외부 API 까지 호출하므로 "
+        "10초 주기 readiness probe 에 사용하면 일일 호출 한도가 빠르게 소진된다."
+    ),
+)
+async def readiness_check():
+    """K8s readinessProbe — DB·Redis 만 빠르게 확인. 서울 API 호출 없음."""
+    db_ok = False
+    redis_ok = False
+
+    try:
+        async with AsyncSessionLocal() as session:
+            await session.execute(text("SELECT 1"))
+        db_ok = True
+    except Exception:
+        pass
+
+    redis_ok = await check_redis_health()
+
+    if db_ok and redis_ok:
+        return JSONResponse(content={"status": "ready"}, status_code=status.HTTP_200_OK)
+
+    return JSONResponse(
+        content={"status": "not_ready", "db": db_ok, "redis": redis_ok},
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+    )
+
+
+@router.get(
     "/health/cache",
     summary="캐시 상태 조회",
     description="Redis 캐시 키 분류별 통계를 조회합니다.",
