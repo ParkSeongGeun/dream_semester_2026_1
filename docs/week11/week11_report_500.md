@@ -15,5 +15,5 @@ iPhone 실기기에서 GET /api/v1/bus/stations(200 OK) → BLE 알림 송신(BF
 
 기타(문제점, 해결방법, 자기평가 등)
 기타 (500자 이내)
-문제점·해결: iOS -1009 로컬 네트워크 거부 → NSLocalNetworkUsageDescription 추가. relation 'users_devices' not exist → init_db side-effect import + environment 가드. readinessProbe 일일 한도 5분 소진 → /health/ready 분리. minikube image 캐시 미갱신 → eval $(minikube docker-env) 내부 빌드. Docker daemon 응답 불가 → osascript+pkill 강제 재시작. EKS dev NAT 비활성 충돌 → 실 프로비저닝 시 퍼블릭 서브넷 배치 또는 VPC Endpoint 로 해결 예정.
+이번 주차에는 여러 인프라 문제를 순서대로 해결하였다. iOS 실기기에서 첫 LAN 요청이 -1009 로 거부된 것은 iOS 14+ 의 로컬 네트워크 권한이 NSAllowsArbitraryLoads 와 별개라는 점을 놓쳤기 때문이었고, Info.plist 에 NSLocalNetworkUsageDescription 과 NSBonjourServices 를 추가하여 해결하였다. readinessProbe 가 10초 주기로 외부 API 를 호출하면서 파드 3개 기준 분당 18회씩 일일 한도를 소진하는 문제는 DB·Redis 만 확인하는 /health/ready 를 분리하여 누수를 완전히 차단하였다. minikube 이미지 캐시 미갱신 문제는 eval $(minikube docker-env) 로 내부 docker 에서 직접 빌드하는 방식으로 우회하였고, Docker daemon 응답 불가 상태는 osascript+pkill 강제 종료 후 재시작으로 복구하였다.
 자기평가: HPA 스케일아웃을 직접 관찰하며 K8s 선언적 자동 스케일링을 체화하였다. readinessProbe 분리 패턴은 probe 주기×replicas×외부 API 호출의 곱이 한도를 소진한다는 인프라 레이어 단일 책임 원칙의 실제 사례였다. 아쉬운 점은 terraform apply 실 EKS 프로비저닝 미완과 iOS BLE hack 미복구이다.
