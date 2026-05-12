@@ -27,3 +27,18 @@ output "s3_bucket_name" {
   description = "S3 버킷 이름"
   value       = module.storage.bucket_name
 }
+
+output "eks_cluster_name" {
+  description = "EKS 클러스터 이름"
+  value       = module.eks.cluster_name
+}
+
+output "eks_cluster_endpoint" {
+  description = "EKS API 서버 엔드포인트"
+  value       = module.eks.cluster_endpoint
+}
+
+output "eks_kubeconfig_command" {
+  description = "kubeconfig 업데이트 명령어"
+  value       = "aws eks update-kubeconfig --region ap-northeast-2 --name ${module.eks.cluster_name}"
+}

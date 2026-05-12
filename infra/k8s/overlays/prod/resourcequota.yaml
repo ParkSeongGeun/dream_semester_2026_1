@@ -1,0 +1,12 @@
+# prod: 운영 환경 — HPA maxReplicas=5 수용 가능한 쿼터
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: prod-quota
+spec:
+  hard:
+    requests.cpu: "2"
+    requests.memory: 2Gi
+    limits.cpu: "4"
+    limits.memory: 4Gi
+    pods: "20"

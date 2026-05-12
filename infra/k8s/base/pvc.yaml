@@ -1,0 +1,13 @@
+# EKS gp2 StorageClass 기반 PVC — 로그/임시 파일 저장용
+# DB 데이터는 RDS에서 관리하므로 1Gi 소용량으로 충분
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: backend-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: gp2
+  resources:
+    requests:
+      storage: 1Gi

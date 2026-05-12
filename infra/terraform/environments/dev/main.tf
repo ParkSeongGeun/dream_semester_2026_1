@@ -102,3 +102,20 @@ module "rds" {
   private_subnet_ids = module.network.private_subnet_ids
   rds_sg_id          = module.security.rds_sg_id
 }
+
+module "eks" {
+  source = "../../modules/eks"
+
+  project_name       = local.name_prefix
+  kubernetes_version = var.eks_kubernetes_version
+
+  # 컨트롤 플레인: 퍼블릭 + 프라이빗 서브넷 모두 지정
+  public_subnet_ids  = module.network.public_subnet_ids
+  private_subnet_ids = module.network.private_subnet_ids
+
+  # dev: NAT 비활성 환경에서 비용 절감을 위해 퍼블릭 서브넷에 노드 배치
+  node_instance_types = var.eks_node_instance_types
+  node_desired_size   = var.eks_node_desired_size
+  node_min_size       = var.eks_node_min_size
+  node_max_size       = var.eks_node_max_size
+}

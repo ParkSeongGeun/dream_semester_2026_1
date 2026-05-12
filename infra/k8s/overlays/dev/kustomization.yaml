@@ -1,0 +1,42 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: comfortablemove-dev
+
+resources:
+  - ../../base
+  - namespace.yaml
+  - resourcequota.yaml
+  - ingress.yaml
+
+patches:
+  # dev: 파드 1개로 줄여 비용 절감
+  - target:
+      kind: Deployment
+      name: backend
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 1
+  # dev: HPA도 최소 1개
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: backend
+    patch: |
+      - op: replace
+        path: /spec/minReplicas
+        value: 1
+      - op: replace
+        path: /spec/maxReplicas
+        value: 3
+  # dev: 환경 설정 덮어쓰기
+  - target:
+      kind: ConfigMap
+      name: backend-config
+    patch: |
+      - op: replace
+        path: /data/ENVIRONMENT
+        value: development
+      - op: replace
+        path: /data/CORS_ORIGINS
+        value: '["http://localhost:3000","http://localhost:8000"]'

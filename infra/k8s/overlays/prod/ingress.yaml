@@ -1,0 +1,26 @@
+# nginx-ingress 기반 도메인 라우팅 — prod 환경
+# TLS 설정: cert-manager 연동 후 tls 섹션 주석 해제
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: backend
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    # cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: api.comfortablemove.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: backend
+                port:
+                  name: http
+  # tls:
+  #   - hosts:
+  #       - api.comfortablemove.com
+  #     secretName: comfortablemove-tls

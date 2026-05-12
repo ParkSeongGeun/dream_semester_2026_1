@@ -100,3 +100,34 @@ variable "s3_bucket_name" {
   type        = string
   default     = "comfortablemove-assets"
 }
+
+# --- EKS ---
+variable "eks_kubernetes_version" {
+  description = "EKS Kubernetes 버전"
+  type        = string
+  default     = "1.29"
+}
+
+variable "eks_node_instance_types" {
+  description = "EKS 노드 인스턴스 타입"
+  type        = list(string)
+  default     = ["t3.medium"] # dev: 최소 사양 (t3.small은 EKS ENI 한도 초과 위험)
+}
+
+variable "eks_node_desired_size" {
+  description = "노드 기본 수"
+  type        = number
+  default     = 1
+}
+
+variable "eks_node_min_size" {
+  description = "노드 최소 수"
+  type        = number
+  default     = 1
+}
+
+variable "eks_node_max_size" {
+  description = "노드 최대 수 (HPA 스케일아웃 고려)"
+  type        = number
+  default     = 3
+}

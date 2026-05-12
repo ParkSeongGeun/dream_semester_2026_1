@@ -1,0 +1,21 @@
+# nginx-ingress 기반 도메인 라우팅 — dev 환경
+# nginx-ingress 설치: helm install ingress-nginx ingress-nginx/ingress-nginx -n ingress-nginx --create-namespace
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: backend
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: dev.api.comfortablemove.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: backend
+                port:
+                  name: http
