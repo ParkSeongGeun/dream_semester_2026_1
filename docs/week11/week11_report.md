@@ -2,7 +2,7 @@
 
 11주차는 두 가지 축으로 구성되었다. 첫 번째 축은 10주차에 구축한 K8s 학습 환경(minikube + 백엔드 Deployment 3 replicas)에서 iPhone 실기기까지 통신 라인을 확장하여 iOS ↔ 백엔드 ↔ ESP32 BLE 하드웨어의 풀스택 통신을 직접 검증하는 것이다. 동시에 10주차 이후 드러난 두 가지 결함—K8s readinessProbe 가 health endpoint 의 외부 API 호출을 트리거하여 서울 TOPIS 일일 한도(100 회) 가 5 분 만에 소진되는 누수, 그리고 백엔드 init_db 가 모델 모듈을 import 하지 않아 boarding_records/users_devices 테이블이 자동 생성되지 않는 누락—을 수정하여 백엔드의 데이터 수집 파이프라인을 정상화한다.
 
-두 번째 축은 AWS EKS 기반 프로덕션 인프라 코드를 작성하는 것이다. 기존 9주차 Terraform 구조(modules/ + environments/dev|prod)에 EKS 모듈을 추가하고, K8s 매니페스트를 kustomize base/overlays 구조로 재편하여 dev/prod 네임스페이스 분리, HPA, PV/PVC, nginx-ingress 를 포함한 EKS 배포 준비 상태를 완성한다.
+두 번째 축은 AWS EKS 기반 프로덕션 인프라 코드를 작성하고 minikube 에서 실제로 구동하는 것이다. 기존 9주차 Terraform 구조(modules/ + environments/dev|prod)에 EKS 모듈을 추가하고, K8s 매니페스트를 kustomize base/overlays 구조로 재편하여 dev/prod 네임스페이스 분리, HPA, PV/PVC, nginx-ingress 를 포함한 EKS 배포 준비 상태를 완성하고 minikube 에서 검증한다.
 
 
 2. 프로젝트 주차 진행 내용
@@ -39,63 +39,45 @@ session.py 의 init_db 안에 from app.models import user_device, boarding_recor
 
 2-7. Terraform EKS 모듈 추가
 
-9주차에 구성한 infra/terraform/modules/ 구조에 eks 모듈을 신설하였다. 모듈 구성:
-- IAM 역할: EKS 컨트롤 플레인(AmazonEKSClusterPolicy), 노드 그룹(AmazonEKSWorkerNodePolicy, AmazonEKS_CNI_Policy, AmazonEC2ContainerRegistryReadOnly) 역할을 각각 생성한다.
-- aws_eks_cluster: 컨트롤 플레인을 퍼블릭+프라이빗 서브넷에 배치하고 엔드포인트 퍼블릭 접근을 활성화하여 로컬 kubectl 접근을 허용한다.
-- aws_eks_node_group: 관리형 노드 그룹을 프라이빗 서브넷에 배치하며 maxUnavailable=1 롤링 업데이트를 적용한다.
+9주차에 구성한 infra/terraform/modules/ 구조에 eks 모듈을 신설하였다. 모듈 구성은 다음과 같다. IAM 역할로 EKS 컨트롤 플레인(AmazonEKSClusterPolicy)과 노드 그룹(AmazonEKSWorkerNodePolicy, AmazonEKS_CNI_Policy, AmazonEC2ContainerRegistryReadOnly) 역할을 각각 생성한다. aws_eks_cluster 로 컨트롤 플레인을 퍼블릭+프라이빗 서브넷에 배치하고 엔드포인트 퍼블릭 접근을 활성화하여 로컬 kubectl 접근을 허용한다. aws_eks_node_group 으로 관리형 노드 그룹을 프라이빗 서브넷에 배치하며 maxUnavailable=1 롤링 업데이트를 적용한다.
 
-environments/dev/main.tf 에 module "eks" 블록을 추가하고 변수 5 개(kubernetes_version, node_instance_types, node_desired/min/max_size) 를 dev/variables.tf 에 정의하였다. terraform init -upgrade + terraform validate 로 구문 검증을 통과하였다.
+environments/dev/main.tf 에 module "eks" 블록을 추가하고 변수 5 개(kubernetes_version, node_instance_types, node_desired/min/max_size) 를 dev/variables.tf 에 정의하였다. terraform init -upgrade 후 terraform validate 로 구문 검증을 통과하였다.
 
 2-8. K8s 매니페스트 kustomize base/overlays 구조 재편
 
 기존 infra/k8s/ 의 단일 환경 구조(minikube 전용) 를 유지하면서 EKS 배포용 base/overlays 구조를 병행 추가하였다.
 
-infra/k8s/base/ — 환경 공통 리소스
-- deployment.yaml: hostAliases 제거(EKS 는 RDS DNS 직접 사용), imagePullPolicy=Always, replicas=2
-- service.yaml: ClusterIP 타입
-- configmap.yaml: ENVIRONMENT=production, CORS_ORIGINS=api.comfortablemove.com 기준
-- hpa.yaml: autoscaling/v2, CPU 70% 임계값, minReplicas=2, maxReplicas=5
-- pvc.yaml: StorageClass gp2, 1Gi ReadWriteOnce
+infra/k8s/base/ 에는 환경 공통 리소스를 두었다. deployment.yaml 은 hostAliases 제거(EKS 는 RDS DNS 직접 사용), imagePullPolicy=Always, replicas=2 로 구성하였다. hpa.yaml 은 autoscaling/v2 API 를 사용하며 CPU 70% 임계값에 minReplicas=2, maxReplicas=5 를 지정하였다. pvc.yaml 은 StorageClass gp2, 1Gi ReadWriteOnce 로 정의하였다.
 
-infra/k8s/overlays/dev/ — dev 환경 패치
-- namespace.yaml: comfortablemove-dev 네임스페이스
-- resourcequota.yaml: CPU 1/2, 메모리 1Gi/2Gi, 파드 10 개 제한
-- ingress.yaml: host=dev.api.comfortablemove.com, ingressClassName=nginx
-- kustomization.yaml: replicas 1 로 패치, ENVIRONMENT=development, CORS_ORIGINS 로컬 허용, HPA minReplicas=1
-
-infra/k8s/overlays/prod/ — prod 환경
-- namespace.yaml: comfortablemove-prod 네임스페이스
-- resourcequota.yaml: CPU 2/4, 메모리 2Gi/4Gi, 파드 20 개 제한
-- ingress.yaml: host=api.comfortablemove.com, TLS 주석 처리(cert-manager 연동 예정)
-- kustomization.yaml: 베이스 그대로(replicas=2, CPU 70% HPA)
+infra/k8s/overlays/dev/ 에는 comfortablemove-dev 네임스페이스, ResourceQuota(CPU 1/2, 메모리 1Gi/2Gi, 파드 10 개), host=dev.api.comfortablemove.com Ingress, replicas=1·HPA minReplicas=1 패치를 두었다. infra/k8s/overlays/prod/ 에는 comfortablemove-prod 네임스페이스, ResourceQuota(CPU 2/4, 메모리 2Gi/4Gi, 파드 20 개), host=api.comfortablemove.com Ingress(TLS 주석)를 두었다.
 
 kubectl kustomize overlays/dev 와 kubectl kustomize overlays/prod 로 dry-run 렌더링을 검증하였다.
 
-2-9. nginx-ingress Helm 설치 절차 정의
+2-9. nginx-ingress Helm 설치 및 Ingress 동작 확인
 
-EKS 클러스터 프로비저닝 후 nginx-ingress-controller 를 Helm 으로 설치하는 절차:
+minikube 에서 Helm 으로 nginx-ingress-controller 를 설치하고 실제 동작을 검증하였다.
 
 ```
 helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
-helm repo update
 helm install ingress-nginx ingress-nginx/ingress-nginx \
-  --namespace ingress-nginx \
-  --create-namespace \
-  --set controller.service.type=LoadBalancer
+  --namespace ingress-nginx --create-namespace \
+  --set controller.service.type=NodePort
 ```
 
-설치 후 kubectl get svc -n ingress-nginx 로 AWS NLB/CLB External IP 를 확인하고, 해당 IP 를 Route 53 레코드(dev.api.comfortablemove.com) 에 연결하면 도메인 기반 라우팅이 동작한다.
+설치 후 ingress-nginx-controller 파드가 1/1 Running 상태로 기동하였고 NodePort 30535(HTTP), 30361(HTTPS) 로 노출되었다. overlays/dev/ingress.yaml 을 comfortablemove 네임스페이스에 적용하여 host=dev.api.comfortablemove.com, ADDRESS=10.99.206.7 로 매핑됨을 kubectl get ingress 로 확인하였다.
+
+2-10. HPA 실제 스케일아웃·스케일인 검증
+
+metrics-server 애드온을 활성화한 후 HPA 를 comfortablemove 네임스페이스에 적용하고 busybox 부하 발생기 3 개를 투입하였다. /api/v1/health/ready 와 /api/v1/bus/arrivals 를 무한 루프로 호출하여 CPU 를 228% 까지 올렸다. HPA 가 70% 임계값을 감지하여 replicas 를 3 → 5(maxReplicas) 로 자동 증가시켰고, kubectl top pods 로 파드별 CPU 214~249m 사용을 확인하였다. 부하 발생기 삭제 후 안정화 기간(기본 5분) 이후 minReplicas=2 로 수렴하는 스케일인이 예정되었다.
 
 
 3. 프로젝트 주차 진행 결과
 
-실기기 풀스택 통신 검증: iPhone 실기기에서 GET /api/v1/bus/stations(200 OK), BLE 알림 송신(BF_DREAM_143 매칭 → "✅ 데이터 전송 성공"), POST /api/v1/boarding/record(HTTP 201, DB 저장 확인) 의 전체 흐름이 한 번의 사용자 동작으로 통과하였다.
+실기기 풀스택 통신 검증: iPhone 실기기에서 GET /api/v1/bus/stations(200 OK), BLE 알림 송신(BF_DREAM_143 → "✅ 데이터 전송 성공"), POST /api/v1/boarding/record(HTTP 201, DB 저장 확인) 의 전체 흐름이 한 번의 사용자 동작으로 통과하였다.
 
-백엔드 데이터 파이프라인 정상화: init_db 의 모델 import 누락과 environment 가드를 수정하여 boarding_records / users_devices 테이블이 컨테이너 첫 기동 시 자동 생성되도록 하였다.
+백엔드 데이터 파이프라인 정상화: init_db 의 모델 import 누락과 environment 가드를 수정하여 boarding_records / users_devices 테이블이 컨테이너 첫 기동 시 자동 생성되도록 하였다. readinessProbe 를 /api/v1/health/ready 로 분리하여 파드 3 개 기준 분당 18 회였던 외부 API 호출이 0 회로 줄었다.
 
-readinessProbe 트래픽 누수 차단: /api/v1/health/ready 분리로 파드 3 개 기준 분당 18 회였던 외부 API 호출이 0 회로 줄었다.
-
-EKS 인프라 코드 완성: Terraform EKS 모듈(클러스터, IAM, 관리형 노드 그룹) 이 terraform validate 를 통과하였고, kustomize base/overlays 구조가 dev/prod 양쪽에서 kubectl kustomize dry-run 을 통과하였다. HPA(CPU 70%), PV/PVC(gp2 1Gi), Namespace + ResourceQuota, nginx-ingress Ingress 리소스가 모두 base/overlays 에 정의되었다.
+EKS 인프라 코드 완성 및 minikube 검증: Terraform EKS 모듈이 terraform validate 를 통과하였고, kustomize base/overlays 구조가 dev/prod 양쪽에서 dry-run 을 통과하였다. minikube 에서 Namespace, ResourceQuota, nginx-ingress(Helm), Ingress, HPA 를 실제로 적용하였다. 특히 HPA 는 CPU 228%/70% 감지 시 replicas 3→5 자동 스케일아웃을 실시간으로 확인하였다.
 
 GitHub: https://github.com/ParkSeongGeun/dream_semester_2026_1
 iOS: https://github.com/BFDream-AutoEver/BFDream-iOS
@@ -109,14 +91,14 @@ iOS: https://github.com/BFDream-AutoEver/BFDream-iOS
 
 iOS 14+ 로컬 네트워크 권한 누락으로 -1009 에러가 발생하였다. NSAllowsArbitraryLoads 만으로는 LAN 통신이 허용되지 않으며 NSLocalNetworkUsageDescription 별도 추가가 필요하다는 점을 학습하였다.
 
-minikube image 캐시 문제로 호스트에서 빌드한 새 이미지가 minikube 안에 반영되지 않았다. 같은 태그(:dev) + IfNotPresent 조합에서 발생하는 흔한 함정이며, eval $(minikube docker-env) 로 minikube 내부 docker 컨텍스트에서 직접 빌드하는 방식으로 우회하였다.
+minikube image 캐시 문제로 호스트에서 빌드한 새 이미지가 minikube 안에 반영되지 않았다. 같은 태그(:dev) + IfNotPresent 조합에서 발생하는 함정이며, eval $(minikube docker-env) 로 minikube 내부 docker 컨텍스트에서 직접 빌드하는 방식으로 우회하였다.
 
-EKS 노드 그룹에서 dev 환경의 NAT Gateway 비활성 문제가 있다. 프라이빗 서브넷의 노드는 ECR 이미지 pull 을 위해 인터넷 접근이 필요한데 dev 는 비용 절감을 위해 NAT 를 끈다. ECR 대신 퍼블릭 Docker Hub 이미지를 쓰거나 VPC Endpoint 를 추가하거나 dev 노드를 퍼블릭 서브넷에 배치하는 세 가지 선택지가 있다. 현재는 코드 레벨에서 변수로 남겨두었고 실제 클러스터 구동 시 결정한다.
+EKS dev 환경에서 NAT Gateway 비활성 문제가 있다. 프라이빗 서브넷 노드는 ECR 이미지 pull 을 위해 인터넷 접근이 필요한데 dev 는 비용 절감을 위해 NAT 를 끈다. 퍼블릭 서브넷에 노드 배치 또는 VPC Endpoint 추가로 해결 가능하며 실제 EKS 프로비저닝 시 결정하기로 하였다.
 
 4-2. 자기평가
 
-가장 큰 성과는 iPhone 실기기에서 iOS ↔ 백엔드 ↔ ESP32 의 풀스택 통신을 한 번의 사용자 동작으로 검증한 점이다. 9~10주차에 각 레이어를 따로 검증했지만 실기기 환경에서 동시에 동작시킨 적은 없었고, 이번 주차에 LAN 노출/로컬 네트워크 권한/BLE 매칭/DB 저장의 네 가지를 한꺼번에 통과시키면서 풀스택 시스템이 끊기는 지점을 직접 체감할 수 있었다.
+가장 큰 성과는 iPhone 실기기에서 iOS ↔ 백엔드 ↔ ESP32 의 풀스택 통신을 한 번의 사용자 동작으로 검증한 점이다. LAN 노출/로컬 네트워크 권한/BLE 매칭/DB 저장의 네 가지를 한꺼번에 통과시키면서 풀스택 시스템이 끊기는 지점을 직접 체감하였다.
 
-EKS 인프라 코드를 terraform validate 수준으로 완성한 것도 의미 있는 성과이다. 9주차에 EC2 기반 모듈 구조(network, security, compute, rds)를 이미 갖추었기 때문에 EKS 모듈을 동일한 패턴으로 추가할 수 있었다. kustomize base/overlays 로 네임스페이스 분리, HPA, PV/PVC, Ingress 를 한 번에 정의하는 작업을 통해 단일 환경(minikube) 에서 멀티 환경(dev/prod EKS) 으로 인프라를 확장하는 구조적 차이를 학습하였다.
+EKS 인프라 코드와 minikube 실검증도 의미 있는 성과이다. kustomize base/overlays 로 네임스페이스 분리·HPA·PV/PVC·Ingress 를 한 번에 정의하는 구조를 체화하였다. HPA 스케일아웃(CPU 228% → replicas 5)을 직접 관찰하면서 K8s 의 선언적 자동 스케일링이 실제로 어떻게 동작하는지 체감하였다. nginx-ingress 를 Helm 으로 설치하고 도메인 기반 Ingress 를 연결하는 절차도 실습하였다.
 
-아쉬운 점은 실제 AWS 계정에 EKS 클러스터를 프로비저닝하고 nginx-ingress 와 HPA 가 동작하는 것까지 검증하지 못한 점이다. terraform apply 와 helm install 의 실행 결과는 다음 주차로 이연하였다. 또한 iOS 임시 hack(mock 143 도착정보 + BLE 송신 번호 고정) 과 통계 API iOS 화면 구현도 미완 상태로 남아 있다.
+아쉬운 점은 실제 AWS 계정에 EKS 를 프로비저닝하고 terraform apply 의 전체 결과를 확인하지 못한 점이다. iOS 임시 hack(mock 143 도착정보 + BLE 송신 번호 고정) 제거와 통계 API iOS 화면 구현도 다음 주차로 이연하였다.
