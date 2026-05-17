@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "comfortablemove.fullname" . }}-config
+  labels:
+    {{- include "comfortablemove.labels" . | nindent 4 }}
+data:
+  ENVIRONMENT: {{ .Values.config.environment | quote }}
+  DEBUG: {{ .Values.config.debug | quote }}
+  HOST: "0.0.0.0"
+  PORT: "8000"
+  LOG_LEVEL: {{ .Values.config.logLevel | quote }}
+  DB_ECHO: "false"
+  DB_POOL_SIZE: {{ .Values.config.dbPoolSize | quote }}
+  DB_MAX_OVERFLOW: {{ .Values.config.dbMaxOverflow | quote }}
+  REDIS_TTL_BUS_ARRIVAL: {{ .Values.config.redisTtlBusArrival | quote }}
+  REDIS_TTL_STATISTICS: {{ .Values.config.redisTtlStatistics | quote }}
+  SEOUL_BUS_API_BASE_URL: {{ .Values.config.seoulBusApiBaseUrl | quote }}
+  SEOUL_BUS_API_TIMEOUT: {{ .Values.config.seoulBusApiTimeout | quote }}
+  SEOUL_BUS_API_MAX_RETRIES: {{ .Values.config.seoulBusApiMaxRetries | quote }}
+  CORS_ORIGINS: {{ .Values.config.corsOrigins | quote }}
+  CORS_ALLOW_CREDENTIALS: {{ .Values.config.corsAllowCredentials | quote }}

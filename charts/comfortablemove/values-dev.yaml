@@ -1,0 +1,18 @@
+replicaCount: 1
+
+image:
+  pullPolicy: IfNotPresent
+
+ingress:
+  enabled: true
+  host: dev.api.comfortablemove.com
+
+hpa:
+  minReplicas: 1
+  maxReplicas: 3
+
+config:
+  environment: development
+  debug: "false"
+  logLevel: INFO
+  corsOrigins: '["http://localhost:3000","http://localhost:8000"]'

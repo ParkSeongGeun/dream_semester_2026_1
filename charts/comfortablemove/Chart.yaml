@@ -1,0 +1,6 @@
+apiVersion: v2
+name: comfortablemove
+description: 맘편한 이동 — 임산부 배려석 알림 서비스 백엔드
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

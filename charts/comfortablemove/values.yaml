@@ -1,0 +1,54 @@
+replicaCount: 2
+
+image:
+  repository: comfortablemove-backend
+  tag: dev
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8000
+
+ingress:
+  enabled: false
+  className: nginx
+  host: api.comfortablemove.com
+
+resources:
+  requests:
+    cpu: "100m"
+    memory: "128Mi"
+  limits:
+    cpu: "500m"
+    memory: "512Mi"
+
+hpa:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+
+config:
+  environment: production
+  debug: "false"
+  logLevel: INFO
+  dbPoolSize: "10"
+  dbMaxOverflow: "20"
+  redisTtlBusArrival: "60"
+  redisTtlStatistics: "300"
+  seoulBusApiBaseUrl: "http://ws.bus.go.kr/api/rest"
+  seoulBusApiTimeout: "10"
+  seoulBusApiMaxRetries: "3"
+  corsOrigins: '["https://api.comfortablemove.com"]'
+  corsAllowCredentials: "true"
+
+secret:
+  databaseUrl: ""
+  redisUrl: ""
+  seoulBusApiKey: ""
+  secretKey: ""
+
+metrics:
+  enabled: true
+  path: /metrics
