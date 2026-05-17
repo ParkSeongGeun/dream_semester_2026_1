@@ -1,0 +1,36 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: comfortablemove-alerts
+  namespace: comfortablemove
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: comfortablemove.rules
+      rules:
+        - alert: HighErrorRate
+          expr: |
+            (
+              sum(rate(http_requests_total{namespace="comfortablemove", status=~"5.."}[5m]))
+              /
+              sum(rate(http_requests_total{namespace="comfortablemove"}[5m]))
+            ) > 0.05
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "API 에러율 5% 초과"
+            description: "최근 5분간 HTTP 5xx 에러율이 {{ $value | humanizePercentage }} 입니다."
+
+        - alert: HighResponseLatency
+          expr: |
+            histogram_quantile(0.95,
+              sum by (le) (rate(http_request_duration_seconds_bucket{namespace="comfortablemove"}[5m]))
+            ) > 1.0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "API 응답 지연 1초 초과 (p95)"
+            description: "p95 응답 시간이 {{ $value }}초 입니다."

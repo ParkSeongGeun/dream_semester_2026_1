@@ -1,0 +1,68 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: comfortablemove-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  comfortablemove.json: |
+    {
+      "title": "ComfortableMove Backend",
+      "uid": "comfortablemove",
+      "schemaVersion": 38,
+      "time": {"from": "now-1h", "to": "now"},
+      "refresh": "30s",
+      "panels": [
+        {
+          "id": 1,
+          "title": "요청 처리량 (req/s)",
+          "type": "timeseries",
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+          "targets": [{
+            "expr": "sum(rate(http_requests_total{namespace=\"comfortablemove\"}[1m]))",
+            "legendFormat": "req/s"
+          }]
+        },
+        {
+          "id": 2,
+          "title": "5xx 에러율 (%)",
+          "type": "timeseries",
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+          "targets": [{
+            "expr": "100 * sum(rate(http_requests_total{namespace=\"comfortablemove\",status=~\"5..\"}[5m])) / sum(rate(http_requests_total{namespace=\"comfortablemove\"}[5m]))",
+            "legendFormat": "error rate %"
+          }]
+        },
+        {
+          "id": 3,
+          "title": "응답시간 p95 (초)",
+          "type": "timeseries",
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+          "targets": [{
+            "expr": "histogram_quantile(0.95, sum by(le) (rate(http_request_duration_seconds_bucket{namespace=\"comfortablemove\"}[5m])))",
+            "legendFormat": "p95 latency"
+          }]
+        },
+        {
+          "id": 4,
+          "title": "CPU 사용률 (cores)",
+          "type": "timeseries",
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+          "targets": [{
+            "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"comfortablemove\",container=\"backend\"}[1m]))",
+            "legendFormat": "cpu cores"
+          }]
+        },
+        {
+          "id": 5,
+          "title": "메모리 사용량 (MiB)",
+          "type": "timeseries",
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+          "targets": [{
+            "expr": "sum(container_memory_working_set_bytes{namespace=\"comfortablemove\",container=\"backend\"}) / 1024 / 1024",
+            "legendFormat": "memory MiB"
+          }]
+        }
+      ]
+    }
