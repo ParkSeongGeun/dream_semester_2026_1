@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>탑승 알림 기록 — 맘편한 이동</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; padding: 40px; background: #f8f9fa; color: #222; }
+    h1 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+    .subtitle { font-size: 13px; color: #666; margin-bottom: 24px; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+    thead tr { background: #2d6be4; color: #fff; }
+    thead th { padding: 12px 14px; text-align: left; font-size: 13px; font-weight: 600; }
+    tbody tr { border-bottom: 1px solid #eee; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:nth-child(even) { background: #f5f8ff; }
+    tbody td { padding: 11px 14px; font-size: 13px; vertical-align: middle; }
+    .badge { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+    .badge-success { background: #e6f4ea; color: #1a7f3c; }
+    .badge-on { background: #fff3cd; color: #856404; }
+    .badge-off { background: #f1f1f1; color: #555; }
+    .record-id { font-family: monospace; font-size: 11px; color: #888; }
+    .footer { margin-top: 20px; font-size: 12px; color: #999; text-align: right; }
+    @media print {
+      body { background: #fff; padding: 20px; }
+      table { box-shadow: none; }
+    }
+  </style>
+</head>
+<body>
+  <h1>탑승 알림 기록 — 맘편한 이동 (ComfortableMove)</h1>
+  <p class="subtitle">boarding_records 테이블 전체 조회 · 생성일 기준 내림차순</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Record ID</th>
+        <th>노선</th>
+        <th>버스 장치 ID</th>
+        <th>정류소</th>
+        <th>소리 알림</th>
+        <th>상태</th>
+        <th>탑승 시각 (UTC)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>1</td>
+        <td class="record-id">b69680d9-992a-4d03-8b2d-adfc494fe2f3</td>
+        <td>143</td>
+        <td>BF_DREAM_143</td>
+        <td>한산중학교</td>
+        <td><span class="badge badge-on">ON</span></td>
+        <td><span class="badge badge-success">success</span></td>
+        <td>2026-05-17 01:45:03</td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td class="record-id">f593cec2-305d-43a4-a9aa-fee9e7673826</td>
+        <td>143</td>
+        <td>BF_DREAM_143</td>
+        <td>한산중학교</td>
+        <td><span class="badge badge-on">ON</span></td>
+        <td><span class="badge badge-success">success</span></td>
+        <td>2026-05-17 01:43:45</td>
+      </tr>
+      <tr>
+        <td>3</td>
+        <td class="record-id">d2bf9862-d1ee-487e-9e39-7925c8230b6b</td>
+        <td>143</td>
+        <td>BF_DREAM_143</td>
+        <td>한산중학교</td>
+        <td><span class="badge badge-on">ON</span></td>
+        <td><span class="badge badge-success">success</span></td>
+        <td>2026-05-17 01:43:18</td>
+      </tr>
+      <tr>
+        <td>4</td>
+        <td class="record-id">ce19acb9-c437-4bf4-a66c-93bd595a7561</td>
+        <td>143</td>
+        <td>BF_DREAM_143</td>
+        <td>한산중학교</td>
+        <td><span class="badge badge-on">ON</span></td>
+        <td><span class="badge badge-success">success</span></td>
+        <td>2026-05-09 12:45:31</td>
+      </tr>
+      <tr>
+        <td>5</td>
+        <td class="record-id">0a5df924-f4d1-4ff9-94e9-70343b59a018</td>
+        <td>143</td>
+        <td>BF_DREAM_143</td>
+        <td>한산중학교</td>
+        <td><span class="badge badge-off">OFF</span></td>
+        <td><span class="badge badge-success">success</span></td>
+        <td>2026-05-09 12:45:21</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p class="footer">총 5건 · PDF 저장: 브라우저 인쇄(Cmd+P) → 대상: PDF로 저장</p>
+</body>
+</html>
