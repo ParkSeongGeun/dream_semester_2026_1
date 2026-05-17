@@ -10,6 +10,7 @@ from typing import AsyncGenerator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from app.core.config import settings
 from app.core.redis import close_redis, init_redis
@@ -94,6 +95,9 @@ async def root():
 from app.api.v1 import router as api_v1_router
 
 app.include_router(api_v1_router, prefix="/api/v1")
+
+# Prometheus 메트릭 엔드포인트 (/metrics)
+Instrumentator().instrument(app).expose(app)
 
 
 if __name__ == "__main__":
