@@ -1,0 +1,17 @@
+[flake8]
+max-line-length = 120
+exclude =
+    __pycache__,
+    .git,
+    migrations,
+    htmlcov,
+    .venv,
+    venv
+per-file-ignores =
+    # 테스트 파일: assert문, 긴 픽스처 허용
+    tests/*: E501, S101
+ignore =
+    # W503: 줄 바꿈 전 이진 연산자 (Black 스타일과 충돌)
+    W503,
+    # E203: 슬라이스 공백 (Black 스타일과 충돌)
+    E203

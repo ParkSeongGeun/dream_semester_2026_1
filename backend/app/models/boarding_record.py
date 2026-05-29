@@ -134,7 +134,7 @@ class BoardingRecord(Base):
     )
 
     # Relationships
-    device: Mapped["UserDevice | None"] = relationship(
+    device: Mapped["UserDevice | None"] = relationship(  # noqa: F821
         "UserDevice",
         back_populates="boarding_records",
     )

@@ -38,7 +38,6 @@ async def close_redis() -> None:
 
     애플리케이션 종료 시 호출됩니다.
     """
-    global redis_client
     if redis_client:
         await redis_client.close()
 

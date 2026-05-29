@@ -92,7 +92,7 @@ async def root():
 
 
 # API v1 라우터 등록
-from app.api.v1 import router as api_v1_router
+from app.api.v1 import router as api_v1_router  # noqa: E402
 
 app.include_router(api_v1_router, prefix="/api/v1")
 

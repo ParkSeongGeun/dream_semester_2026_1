@@ -9,8 +9,6 @@ Endpoints:
   - GET /api/v1/bus/stations?tmX=&tmY=&radius=  (iOS getStationByPos 대체)
 """
 
-from datetime import datetime, timedelta, timezone
-
 from fastapi import APIRouter, HTTPException, Query, status
 
 from app.core.config import settings

@@ -7,7 +7,7 @@ iOS 기기 정보를 저장하는 테이블 (users_devices)
 """
 
 import uuid
-from datetime import datetime, timezone, date
+from datetime import datetime, date
 
 from sqlalchemy import Boolean, CheckConstraint, Date, String, func
 from sqlalchemy.dialects.postgresql import TIMESTAMP, UUID
@@ -91,7 +91,7 @@ class UserDevice(Base):
     )
 
     # Relationships
-    boarding_records: Mapped[list["BoardingRecord"]] = relationship(
+    boarding_records: Mapped[list["BoardingRecord"]] = relationship(  # noqa: F821
         "BoardingRecord",
         back_populates="device",
         cascade="save-update, merge",

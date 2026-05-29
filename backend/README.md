@@ -2,6 +2,39 @@
 
 임산부 배려석 알림 서비스 백엔드 API
 
+[![CI](https://github.com/ParkSeongGeun/dream_semester_2026_1/actions/workflows/ci.yml/badge.svg)](https://github.com/ParkSeongGeun/dream_semester_2026_1/actions/workflows/ci.yml)
+
+---
+
+## 🔄 CI/CD 파이프라인
+
+`backend/**` 경로 변경 시 push·PR 이벤트에 의해 자동으로 아래 파이프라인이 실행됩니다.
+
+```
+push / pull_request (backend/**)
+         │
+         ▼
+  [Job 1] lint         flake8 정적 분석
+         │
+         ▼
+  [Job 2] test         pytest + coverage (SQLite in-memory)
+         │
+         ▼
+  [Job 3] build-and-push   Docker 이미지 빌드
+                           └─ main 브랜치 push + ECR Secrets 등록 시
+                              → Amazon ECR 태그·푸시 (SHA + latest)
+```
+
+### 필요한 GitHub Secrets
+
+| Secret | 설명 |
+|--------|------|
+| `AWS_ACCESS_KEY_ID` | IAM 사용자 Access Key |
+| `AWS_SECRET_ACCESS_KEY` | IAM 사용자 Secret Key |
+| `ECR_REGISTRY` | ECR 레지스트리 URI (예: `123456789.dkr.ecr.ap-northeast-2.amazonaws.com`) |
+
+> Secrets 미등록 시 lint·test·빌드 검증은 정상 수행되며 ECR 푸시만 warning으로 건너뜁니다.
+
 ---
 
 ## 📋 프로젝트 개요
