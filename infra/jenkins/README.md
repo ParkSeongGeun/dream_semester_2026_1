@@ -33,6 +33,17 @@ Checkout → Lint(flake8) → Test(pytest) → Docker Build → Push to ECR
 - **Docker Build**: 운영 이미지 빌드
 - **Push to ECR**: `ECR_REGISTRY` 환경변수가 있을 때만 실행 (미설정 시 graceful skip)
 
+## 멀티브랜치 & SCM 폴링
+
+JCasC는 두 종류의 Job을 생성한다.
+
+- `comfortablemove-backend` — 단일 브랜치(main) 파이프라인. `SCMTrigger('H/2 * * * *')`로 2분마다 폴링하여 변경 시 자동 빌드.
+- `comfortablemove-multibranch` — 멀티브랜치 파이프라인. **git source**(`git ls-remote`)로 모든 브랜치를 발견하므로 GitHub API rate limit/토큰이 필요 없다. `periodicFolderTrigger(2m)`로 새 브랜치/커밋을 폴링한다.
+
+> **주의**: 멀티브랜치 job-dsl은 JCasC `reload` API로는 적용되지 않는다(파싱 실패). `casc.yaml`의 멀티브랜치 정의를 바꾼 뒤에는 반드시 `docker restart comfortablemove-jenkins`로 초기 로드해야 한다.
+
+Webhook 즉시 트리거 대신 SCM 폴링을 쓰는 이유: 현재 컨테이너는 `root` + `docker.sock` 마운트 + 기본 비밀번호라, GitHub Webhook을 받기 위해 공개 인터넷에 노출하면 호스트 장악 위험이 있다. 폴링은 외부 노출이 전혀 없다.
+
 ## 빌드 수동 트리거 (REST API)
 
 로컬 Jenkins는 외부 공인 URL이 없어 GitHub Webhook을 직접 받기 어렵다. 대신 REST API로 트리거하여 동작을 검증할 수 있다.
