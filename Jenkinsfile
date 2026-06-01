@@ -1,7 +1,11 @@
 // ============================================
 // 맘편한 이동 백엔드 - Jenkins Declarative Pipeline (14주차)
-//   Checkout → Build → Lint → Test → Docker Build → Push to ECR
+//   Checkout → Lint → Test → Docker Build → Push to ECR
 //   13주차 GitHub Actions(ci.yml)와 동일한 단계를 Jenkins 로 재구성
+//
+//   설계 노트: 테스트/운영 빌드는 공식 python:3.12-slim 기반 Docker 이미지로 수행한다.
+//   Jenkins 노드(ARM64)에서 직접 pip install 하면 asyncpg/pydantic-core 가
+//   네이티브 컴파일에 실패하므로, wheel 이 정상 제공되는 컨테이너 안에서 빌드한다.
 // ============================================
 pipeline {
     agent any
@@ -9,12 +13,6 @@ pipeline {
     environment {
         ECR_REPOSITORY = 'comfortablemove-backend'
         AWS_REGION     = 'ap-northeast-2'
-        // pytest 용 환경변수 (conftest 의 SQLite DI override 가 실제 쿼리를 처리)
-        DATABASE_URL      = 'postgresql+asyncpg://test:test@localhost:5432/test'
-        REDIS_URL         = 'redis://localhost:6379/0'
-        ENVIRONMENT       = 'development'
-        SEOUL_BUS_API_KEY = 'test_key_for_ci'
-        SECRET_KEY        = 'ci-test-secret-key'
     }
 
     options {
@@ -34,43 +32,47 @@ pipeline {
             }
         }
 
-        stage('Build') {
+        // flake8 은 순수 파이썬이라 Jenkins 노드 venv 에서 바로 실행 가능 (컴파일 불필요)
+        stage('Lint') {
             steps {
                 dir('backend') {
                     sh '''
                         python3 -m venv .venv
                         . .venv/bin/activate
-                        python -m pip install --upgrade pip
-                        pip install -r requirements.txt flake8
-                    '''
-                }
-            }
-        }
-
-        stage('Lint') {
-            steps {
-                dir('backend') {
-                    sh '''
-                        . .venv/bin/activate
+                        pip install -q --upgrade pip
+                        pip install -q flake8
                         flake8 app/ --count --statistics
                     '''
                 }
             }
         }
 
+        // Dockerfile.test(python:3.12-slim) 로 테스트 이미지를 빌드한 뒤 컨테이너에서 pytest 실행
         stage('Test') {
             steps {
-                dir('backend') {
-                    sh '''
-                        . .venv/bin/activate
-                        pytest tests/ -v -m "not slow" \
-                            --cov=app --cov-report=xml:coverage.xml \
+                sh '''
+                    docker build -f backend/Dockerfile.test -t comfortablemove-test:${IMAGE_TAG} ./backend
+                    mkdir -p backend/test-results
+                    docker run --name cm-test-${BUILD_NUMBER} \
+                        -e ENVIRONMENT=development \
+                        -e SEOUL_BUS_API_KEY=test_key_for_ci \
+                        -e SECRET_KEY=ci-test-secret-key \
+                        -e DATABASE_URL=postgresql+asyncpg://test:test@localhost:5432/test \
+                        -e REDIS_URL=redis://localhost:6379/0 \
+                        comfortablemove-test:${IMAGE_TAG} \
+                        python -m pytest tests/ -v -m "not slow" \
+                            --cov=app --cov-report=term-missing \
                             --junitxml=test-results/junit.xml
-                    '''
-                }
+                '''
             }
             post {
                 always {
+                    // 컨테이너 안에서 생성된 junit 리포트를 workspace 로 추출 후 게시
+                    sh '''
+                        docker cp cm-test-${BUILD_NUMBER}:/app/test-results/junit.xml \
+                            backend/test-results/junit.xml || true
+                        docker rm -f cm-test-${BUILD_NUMBER} || true
+                    '''
                     junit allowEmptyResults: true, testResults: 'backend/test-results/junit.xml'
                 }
             }
@@ -109,7 +111,8 @@ pipeline {
             echo "❌ Pipeline 실패 — 콘솔 로그 확인 필요"
         }
         always {
-            // Slack 알림 (SLACK_CHANNEL 설정 시에만 발송)
+            // 빌드 산출물(테스트 이미지) 정리 + Slack 알림(SLACK_CHANNEL 설정 시에만)
+            sh 'docker rmi comfortablemove-test:${IMAGE_TAG} || true'
             script {
                 if (env.SLACK_CHANNEL?.trim()) {
                     slackSend(
