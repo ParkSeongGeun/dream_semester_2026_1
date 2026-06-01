@@ -7,6 +7,9 @@
 *.pem
 *-outputs.env
 
+# Jenkins 로컬 환경 파일 (비밀번호/토큰 포함)
+infra/jenkins/.env
+
 # Terraform
 **/.terraform/
 **/.terraform.lock.hcl

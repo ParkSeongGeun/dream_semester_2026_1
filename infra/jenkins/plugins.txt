@@ -1,0 +1,24 @@
+# Configuration as Code - Jenkins 설정을 YAML로 관리
+configuration-as-code
+
+# Pipeline (workflow-aggregator = Declarative/Scripted 파이프라인 전체 묶음)
+workflow-aggregator
+pipeline-stage-view
+
+# Job DSL - JCasC에서 Job을 코드로 생성
+job-dsl
+
+# SCM 연동
+git
+github
+github-branch-source
+
+# Docker 파이프라인 (docker build/agent)
+docker-workflow
+
+# 자격증명 관리 (AWS/ECR/Slack 토큰)
+credentials
+credentials-binding
+
+# Slack 빌드 알림
+slack

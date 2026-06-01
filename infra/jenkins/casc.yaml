@@ -1,0 +1,62 @@
+# ============================================
+# Jenkins Configuration as Code (JCasC)
+# 관리자 계정 · 권한 · 파이프라인 Job 을 코드로 정의
+# 환경변수(${...})는 docker-compose 의 .env 에서 주입된다.
+# ============================================
+jenkins:
+  systemMessage: "맘편한 이동 - Jenkins CI (14주차, Configuration as Code 로 구성됨)"
+  numExecutors: 2
+
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: "${JENKINS_ADMIN_ID:-admin}"
+          password: "${JENKINS_ADMIN_PASSWORD:-admin123!}"
+
+  authorizationStrategy:
+    loggedInUsersCanDoAnything:
+      allowAnonymousRead: false
+
+unclassified:
+  location:
+    url: "${JENKINS_URL:-http://localhost:8080/}"
+
+  # Slack 알림 (SLACK_TOKEN, SLACK_CHANNEL 가 .env 에 있을 때만 동작)
+  slackNotifier:
+    teamDomain: "${SLACK_TEAM:-}"
+    tokenCredentialId: "slack-token"
+
+credentials:
+  system:
+    domainCredentials:
+      - credentials:
+          - string:
+              scope: GLOBAL
+              id: "slack-token"
+              secret: "${SLACK_TOKEN:-dummy}"
+              description: "Slack Bot Token (빌드 알림용)"
+
+# ============================================
+# 파이프라인 Job 정의 (Job DSL)
+# GitHub 저장소를 체크아웃하고 루트의 Jenkinsfile 을 실행한다.
+# ============================================
+jobs:
+  - script: >
+      pipelineJob('comfortablemove-backend') {
+        description('맘편한 이동 백엔드 CI 파이프라인 — Checkout → Build → Lint → Test → Docker Build → Push to ECR (14주차)')
+        definition {
+          cpsScm {
+            scm {
+              git {
+                remote {
+                  url('https://github.com/ParkSeongGeun/dream_semester_2026_1.git')
+                }
+                branches('*/main')
+              }
+            }
+            scriptPath('Jenkinsfile')
+            lightweight(true)
+          }
+        }
+      }
