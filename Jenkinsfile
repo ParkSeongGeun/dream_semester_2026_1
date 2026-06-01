@@ -71,6 +71,7 @@ pipeline {
                 always {
                     // 컨테이너 안에서 생성된 junit 리포트를 workspace 로 추출 후 게시
                     sh '''
+                        mkdir -p backend/test-results
                         docker cp cm-test-${BUILD_NUMBER}:/app/test-results/junit.xml \
                             backend/test-results/junit.xml || true
                         docker rm -f cm-test-${BUILD_NUMBER} || true
