@@ -27,6 +27,8 @@ services:
       - jenkins_home:/var/jenkins_home
       # host Docker 데몬 공유 (Docker outside of Docker) → 파이프라인에서 docker build 가능
       - /var/run/docker.sock:/var/run/docker.sock
+      # JCasC 설정을 마운트하여 재빌드 없이 reload 로 갱신 가능
+      - ./casc.yaml:/usr/share/jenkins/ref/casc.yaml:ro
 
 volumes:
   jenkins_home:
