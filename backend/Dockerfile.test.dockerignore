@@ -1,0 +1,24 @@
+# Dockerfile.test 전용 ignore (BuildKit: <dockerfile>.dockerignore 우선 적용)
+# 운영용 .dockerignore 와 달리 tests/ 를 포함시켜 pytest 가 가능하도록 한다.
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.pytest_cache/
+.coverage
+htmlcov/
+locustfile.py
+
+# Docker / Docs / Git / 환경파일
+docker-compose*.yml
+Dockerfile*
+.dockerignore
+docs/
+*.md
+.env
+.env.*
+!.env.example
+.git/
+.gitignore
+.DS_Store

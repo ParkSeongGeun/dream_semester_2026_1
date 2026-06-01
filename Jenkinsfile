@@ -13,6 +13,8 @@ pipeline {
     environment {
         ECR_REPOSITORY = 'comfortablemove-backend'
         AWS_REGION     = 'ap-northeast-2'
+        // per-Dockerfile ignore(Dockerfile.test.dockerignore) 적용을 위해 BuildKit 활성화
+        DOCKER_BUILDKIT = '1'
     }
 
     options {
