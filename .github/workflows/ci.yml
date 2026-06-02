@@ -1,6 +1,7 @@
 name: CI - Lint, Test & Build
 
 on:
+  workflow_dispatch:        # 수동 트리거 (캐시 효과 측정 등)
   pull_request:
     branches: [main]
     paths:
