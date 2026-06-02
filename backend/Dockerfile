@@ -24,11 +24,14 @@ COPY --from=builder /install /usr/local
 
 WORKDIR /app
 
-# 애플리케이션 코드 복사
+# 애플리케이션 코드 + Alembic 마이그레이션 복사
 COPY app/ ./app/
+COPY alembic/ ./alembic/
+COPY alembic.ini ./
+COPY scripts/entrypoint.sh /usr/local/bin/entrypoint.sh
 
-# 소유권 변경
-RUN chown -R appuser:appuser /app
+# 소유권 변경 + entrypoint 실행 권한
+RUN chown -R appuser:appuser /app && chmod +x /usr/local/bin/entrypoint.sh
 
 # non-root 유저로 전환
 USER appuser
@@ -46,7 +49,8 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')" || exit 1
 
-# Gunicorn + Uvicorn worker로 실행
+# DB 마이그레이션(alembic upgrade head) 후 Gunicorn + Uvicorn worker로 실행
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["gunicorn", "app.main:app", \
      "--worker-class", "uvicorn.workers.UvicornWorker", \
      "--bind", "0.0.0.0:8000", \
