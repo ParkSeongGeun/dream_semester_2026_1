@@ -16,7 +16,7 @@ usermod -aG docker ec2-user
 
 # --- Docker Compose 설치 ---
 COMPOSE_VERSION="v2.29.1"
-curl -L "https://github.com/docker/compose/releases/download/$${COMPOSE_VERSION}/docker-compose-linux-$(uname -m)" \
+curl -fsSL "https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker-compose-linux-$(uname -m)" \
   -o /usr/local/bin/docker-compose
 chmod +x /usr/local/bin/docker-compose
 ln -sf /usr/local/bin/docker-compose /usr/bin/docker-compose
