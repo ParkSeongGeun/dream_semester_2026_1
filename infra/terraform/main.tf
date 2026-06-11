@@ -120,3 +120,15 @@ module "monitoring" {
   target_group_arn_suffix = module.ingress.target_group_arn_suffix
   db_instance_id          = module.rds.db_instance_id
 }
+
+# --- 9. EKS (15주차 ArgoCD GitOps 기반) ---
+# NAT Gateway 미사용 환경이므로 노드를 public 서브넷에 배치하여
+# IGW 경유로 외부 통신(ECR pull, EKS control plane join)을 가능하게 한다. (학습용 비용 절감)
+module "eks" {
+  source = "./modules/eks"
+
+  project_name       = var.project_name
+  kubernetes_version = "1.33" # EKS 지원 버전 (1.29 지원 종료)
+  private_subnet_ids = module.network.public_subnet_ids
+  public_subnet_ids  = module.network.public_subnet_ids
+}

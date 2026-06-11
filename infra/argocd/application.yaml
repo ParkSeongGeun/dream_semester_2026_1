@@ -1,0 +1,40 @@
+# =============================================================
+# ArgoCD Application — comfortablemove GitOps (15주차)
+# Git(infra/k8s/eks-app) ↔ EKS 클러스터 동기화
+# =============================================================
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: comfortablemove
+  namespace: argocd
+  # 삭제 시 클러스터 리소스도 정리
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/ParkSeongGeun/dream_semester_2026_1.git
+    targetRevision: main
+    path: infra/k8s/eks-app
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: comfortablemove
+
+  syncPolicy:
+    # 자동 동기화: Git 변경 시 클러스터에 자동 반영
+    automated:
+      prune: true # Git 에서 삭제된 리소스는 클러스터에서도 제거
+      selfHeal: true # 클러스터 수동 변경(drift)을 Git 기준으로 자동 복구
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+
+  # 롤백/히스토리 보존 (ArgoCD UI 에서 이전 리비전으로 롤백 가능)
+  revisionHistoryLimit: 10
