@@ -5,14 +5,14 @@
 
 필수 진행내용
 진행내용 (500자 이내)
-Terraform에 eks 모듈 호출을 추가하여 EKS를 생성하였다. 쿠버네티스 1.33을 사용하고 NAT 없는 환경이라 노드를 public 서브넷에 배치하였다. ArgoCD를 Helm으로 설치하고 postgres와 redis, backend(ECR 이미지) 매니페스트를 GitOps 대상으로 구성하였다. Application에 자동 동기화와 selfHeal, 롤백 히스토리를 설정하니 즉시 Synced와 Healthy 상태가 되었다. backend replicas를 변경해 push하자 자동 배포되고 Git revert로 롤백되는 것을 확인하였다. Ansible은 common과 docker role로 Playbook을 작성해 EC2를 초기 설정하였다. 14주차 ECR은 Terraform 리포 생성과 Secrets 등록으로 CI push를 활성화하였다.
+Terraform에 eks 모듈 호출을 추가하여 EKS를 생성하였다. 쿠버네티스 1.33을 사용하고 NAT 없는 환경이라 노드를 public 서브넷에 배치하였다. ArgoCD를 Helm으로 설치하고 postgres와 redis, backend(ECR 이미지) 매니페스트를 GitOps 대상으로 구성하였다. Application에 자동 동기화와 자동 복구, 롤백 히스토리를 설정하니 즉시 정상 동기화와 양호 상태가 되었다. backend replicas를 변경해 반영하자 자동 배포되고 Git에서 되돌리자 롤백되는 것을 확인하였다. Ansible은 common과 docker 역할로 Playbook을 작성해 EC2를 초기 설정하였다. 14주차 ECR은 Terraform 리포 생성과 자격증명 등록으로 CI의 이미지 적재를 활성화하였다.
 
 
 필수 진행결과
 진행결과 (500자 이내)
-ECR에 커밋 SHA와 latest 태그가 적재됨을 직접 확인하였다. EKS 노드 2개가 Ready 상태가 되었고 ArgoCD Application이 Synced와 Healthy로 pod 4개가 기동되었다. 매니페스트의 replicas를 2에서 3으로 변경해 push하자 약 20초 내에 자동 배포되었고, Git revert로 3에서 2로 되돌리자 약 20초 내에 자동 복구되었다. 배포 히스토리 3개 리비전으로 롤백 추적이 가능하다. Ansible은 EC2 초기 설정을 71초에 완료하였고 재실행 시 멱등하게 통과하였다.
+ECR에 커밋 SHA와 latest 태그가 적재됨을 직접 확인하였다. EKS 노드 2개가 Ready 상태가 되었고 ArgoCD Application이 정상 동기화와 양호 상태로 pod 4개가 기동되었다. 매니페스트의 replicas를 2에서 3으로 변경해 반영하자 약 20초 내에 자동 배포되었고, Git에서 3에서 2로 되돌리자 약 20초 내에 자동 복구되었다. 배포 히스토리 3개 리비전으로 롤백 추적이 가능하다. Ansible은 EC2 초기 설정을 71초에 완료하였고 재실행 시 멱등하게 통과하였다.
 
 
 기타(문제점, 해결방법, 자기평가 등)
 기타 (500자 이내)
-EKS는 쿠버네티스 1.29 지원 종료로 1.33으로 변경하였고, NAT 없는 환경에서 노드를 public 서브넷에 배치하였다. Ansible은 제거된 yaml callback을 result_format으로 교체하고 Amazon Linux 2023의 curl 충돌을 제외하여 해결하였다. 자기평가로는 외부에서 명령하는 push 기반 배포와 달리, 클러스터 내 컨트롤러가 Git을 관찰해 스스로 동기화하는 pull 기반 GitOps의 강점을 체감하였다. CI가 빌드한 이미지가 ECR에 보관되고 EKS가 pull하여 ArgoCD로 배포되는 전체 파이프라인을 하나로 연결하였다. 실습 후에는 비용상 terraform destroy로 환경 정리가 필요하다.
+EKS는 쿠버네티스 1.29 지원 종료로 1.33으로 변경하였고, NAT 없는 환경에서 노드를 public 서브넷에 배치하였다. Ansible은 제거된 출력 형식 옵션을 새 옵션으로 교체하고 Amazon Linux 2023의 기본 HTTP 패키지 충돌을 제외하여 해결하였다. 자기평가로는 외부에서 명령을 밀어넣는 방식의 배포와 달리, 클러스터 내 컨트롤러가 Git을 관찰해 스스로 동기화하는 방식의 GitOps 강점을 체감하였다. CI가 빌드한 이미지가 ECR에 보관되고 EKS가 이를 가져와 ArgoCD로 배포되는 전체 파이프라인을 하나로 연결하였다. 실습 후에는 비용을 고려해 생성한 리소스를 정리할 필요가 있다.
