@@ -1,0 +1,21 @@
+---
+# =============================================================
+# ComfortableMove 서버 초기 설정 Playbook (15주차)
+# 새 서버를 Docker 구동 가능 상태로 자동 프로비저닝 (10분 이내 목표)
+# 실행: ansible-playbook playbook.yml
+# 문법검사: ansible-playbook playbook.yml --syntax-check
+# 사전점검: ansible-playbook playbook.yml --check
+# =============================================================
+- name: ComfortableMove 서버 초기 설정
+  hosts: webservers
+  become: true
+  gather_facts: true
+
+  roles:
+    - common # 시스템 업데이트 + 기본 유틸리티
+    - docker # Docker + docker compose
+
+  post_tasks:
+    - name: 프로비저닝 요약
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }} 초기 설정 완료 — Docker {{ docker_version_check.stdout | default('installed') }}"

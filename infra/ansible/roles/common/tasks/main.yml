@@ -1,0 +1,19 @@
+---
+# common role: 시스템 업데이트 + 기본 유틸리티
+- name: 시스템 패키지 캐시 업데이트
+  ansible.builtin.dnf:
+    update_cache: true
+
+- name: 기본 유틸리티 설치
+  ansible.builtin.dnf:
+    name: "{{ common_packages }}"
+    state: present
+
+- name: 시간대 Asia/Seoul 설정
+  ansible.builtin.command: timedatectl set-timezone Asia/Seoul
+  register: tz_result
+  changed_when: false
+
+- name: 설치된 유틸리티 확인
+  ansible.builtin.debug:
+    msg: "기본 패키지 설치 완료: {{ common_packages | join(', ') }}"

@@ -1,0 +1,39 @@
+---
+# docker role: Docker Engine + docker compose plugin
+- name: Docker 설치
+  ansible.builtin.dnf:
+    name: docker
+    state: present
+
+- name: Docker 서비스 시작 및 부팅 시 자동 실행
+  ansible.builtin.systemd:
+    name: docker
+    state: started
+    enabled: true
+
+- name: 원격 사용자를 docker 그룹에 추가 (sudo 없이 docker 실행)
+  ansible.builtin.user:
+    name: "{{ ansible_user }}"
+    groups: docker
+    append: true
+
+- name: docker compose plugin 디렉터리 생성
+  ansible.builtin.file:
+    path: /usr/local/lib/docker/cli-plugins
+    state: directory
+    mode: "0755"
+
+- name: docker compose plugin 설치
+  ansible.builtin.get_url:
+    url: "https://github.com/docker/compose/releases/download/{{ compose_version }}/docker-compose-linux-{{ ansible_architecture }}"
+    dest: /usr/local/lib/docker/cli-plugins/docker-compose
+    mode: "0755"
+
+- name: docker compose 버전 확인
+  ansible.builtin.command: docker compose version
+  register: docker_version_check
+  changed_when: false
+
+- name: docker compose 동작 확인 출력
+  ansible.builtin.debug:
+    var: docker_version_check.stdout

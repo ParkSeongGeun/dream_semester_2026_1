@@ -107,4 +107,17 @@ GitHub: https://github.com/ParkSeongGeun/dream_semester_2026_1
 
 GitHub Actions의 Job 의존성(`needs`), 서비스 컨테이너(`services`), Secrets 활용, conditional step(`if:` 조건)을 하나의 실제 파이프라인에서 모두 적용하면서 CI 구축의 전체 흐름을 체감하였다. 특히 코드에 민감 정보를 포함하지 않고 Secrets로 분리하는 패턴, 그리고 Secrets 미등록 시 graceful skip으로 개발 초기부터 배포 인프라 없이도 파이프라인을 사용할 수 있게 설계하는 방식이 인상적이었다.
 
-아쉬운 점은 실제 GitHub Actions 상에서 워크플로우가 트리거되는 것을 직접 관찰하지 못한 것이다. 로컬 YAML 검증과 flake8 통과만 확인하였고, ECR 푸시는 실제 AWS 계정과 연동되지 않았다.
+초기에는 실제 GitHub Actions 트리거를 직접 관찰하지 못하였으나, 이후 후속 검증으로 모두 완결하였다(아래 4-3 참조).
+
+### 4-3. 후속 검증 (피드백 반영)
+
+실제 GitHub Actions에서의 동작을 다음과 같이 정량 검증하였다.
+
+| 항목 | 결과 |
+|------|------|
+| main push 트리거 | success — flake8 0건, pytest 77 완주 |
+| PR(pull_request) 트리거 | success — 동일 파이프라인 완주 |
+| pip 캐싱 정량 | 캐시 미스 약 10초 ≈ 히트 약 10초 |
+| ECR 이미지 적재 | CI build-and-push → ECR에 커밋 SHA + latest 태그 적재 확인 |
+
+pip 캐싱은 캐시를 완전히 비운 상태(미스)와 복원 상태(히트)를 컨트롤 실험으로 비교한 결과, 본 프로젝트 규모(의존성 약 15개)에서는 빌드 시간 단축 효과가 미미함을 정량적으로 확인하였다. 이는 의존성이 작아 PyPI 다운로드 자체가 빠르기 때문이며, 캐싱은 의존성이 크거나 빌드가 무거운 프로젝트에서 효과가 두드러진다. ECR 적재는 Terraform으로 리포지토리를 생성하고 GitHub Secrets를 등록한 뒤, main push 시 CI가 실제로 푸시한 이미지를 `aws ecr describe-images`로 직접 확인하였다.

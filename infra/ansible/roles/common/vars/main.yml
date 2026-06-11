@@ -1,0 +1,9 @@
+---
+# common role 변수
+# 주의: Amazon Linux 2023 은 curl-minimal 이 기본이라 curl 추가 시 충돌 → 제외
+common_packages:
+  - git
+  - vim
+  - htop
+  - tar
+  - python3
