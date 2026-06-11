@@ -25,6 +25,8 @@ push / pull_request (backend/**)
                               → Amazon ECR 태그·푸시 (SHA + latest)
 ```
 
+> 배포 레지스트리: Amazon ECR `comfortablemove-backend` (ap-northeast-2 리전). main 브랜치 push 시 커밋 SHA·latest 태그로 이미지가 적재됩니다.
+
 ### 필요한 GitHub Secrets
 
 | Secret | 설명 |
