@@ -98,7 +98,7 @@ spec:
     spec:
       containers:
         - name: backend
-          image: 299149745641.dkr.ecr.ap-northeast-2.amazonaws.com/comfortablemove-backend:b26a0d6ec2bef6c5f5d405bbddcdb2999e4c810a
+          image: 299149745641.dkr.ecr.ap-northeast-2.amazonaws.com/comfortablemove-backend:42f398987ad72dc700ae2f22062e1d35b5b8ba24
           ports: [{ containerPort: 8000 }]
           envFrom:
             - secretRef: { name: backend-secret }
