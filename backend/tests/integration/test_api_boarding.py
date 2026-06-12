@@ -155,10 +155,13 @@ class TestBoardingAPI:
         users_devices 에 자동 등록(upsert) 되어 FK 위반 없이 성공해야 한다."""
         import uuid
         from sqlalchemy import select
+        from app.core.security import pseudonymize_device_id
         from app.models.user_device import UserDevice
         from app.models.boarding_record import BoardingRecord
 
         new_device_uuid = uuid.uuid4()
+        # 서버는 device_id 를 가명화하여 저장하므로, 사후 조회도 가명화값으로 한다.
+        stored_id = pseudonymize_device_id(new_device_uuid)
 
         # 사전 조건: users_devices 에 해당 UUID 없음
         existing = await test_db.execute(
@@ -178,15 +181,15 @@ class TestBoardingAPI:
 
         assert response.status_code == 201
 
-        # 사후 조건: users_devices 에 자동 등록됨
+        # 사후 조건: users_devices 에 가명화된 device_id 로 자동 등록됨
         registered = await test_db.execute(
-            select(UserDevice).where(UserDevice.device_id == new_device_uuid)
+            select(UserDevice).where(UserDevice.device_id == stored_id)
         )
         assert registered.scalar_one_or_none() is not None
 
-        # 사후 조건: boarding_records 에 device_id 와 함께 기록됨
+        # 사후 조건: boarding_records 에 가명화된 device_id 와 함께 기록됨
         records = await test_db.execute(
-            select(BoardingRecord).where(BoardingRecord.device_id == new_device_uuid)
+            select(BoardingRecord).where(BoardingRecord.device_id == stored_id)
         )
         assert records.scalar_one_or_none() is not None
 

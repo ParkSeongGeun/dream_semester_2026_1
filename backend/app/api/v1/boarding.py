@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.security import pseudonymize_device_id
 from app.db.session import get_db
 from app.models.boarding_record import BoardingRecord
 from app.models.user_device import UserDevice
@@ -50,18 +51,26 @@ async def create_boarding_record(
         HTTPException 400: 유효성 검증 실패
     """
     try:
+        # 개인정보 보호: 원본 device_id 를 그대로 저장하지 않고 가명화(HMAC)한다.
+        # 같은 입력은 같은 결과라 통계 집계·FK 관계는 그대로 유지된다.
+        device_id = (
+            pseudonymize_device_id(request.device_id)
+            if request.device_id is not None
+            else None
+        )
+
         # 1) device_id 가 있으면 users_devices 자동 upsert (FK 위반 방지).
         #    iOS DeviceIdentityManager 가 생성한 익명 UUID 가 처음 들어오면
         #    UserDevice 레코드를 즉시 만들어 둔다. 이후 통계 API 가 이 행을 기준 키로 사용.
-        if request.device_id is not None:
+        if device_id is not None:
             existing_q = await db.execute(
-                select(UserDevice).where(UserDevice.device_id == request.device_id)
+                select(UserDevice).where(UserDevice.device_id == device_id)
             )
             existing = existing_q.scalar_one_or_none()
             if existing is None:
                 db.add(
                     UserDevice(
-                        device_id=request.device_id,
+                        device_id=device_id,
                         sound_enabled=request.sound_enabled,
                     )
                 )
@@ -73,15 +82,16 @@ async def create_boarding_record(
 
         # 2) BoardingRecord insert
         boarding_record = BoardingRecord(
-            device_id=request.device_id,
+            device_id=device_id,
             route_name=request.route_name,
             route_type=request.route_type,
             bus_device_id=request.bus_device_id,
             station_id=request.station_id,
             station_name=request.station_name,
             ars_id=request.ars_id,
-            latitude=request.latitude,
-            longitude=request.longitude,
+            # 개인정보 최소 수집: 정밀 위치 대신 약 100m 단위(소수점 3자리)로 절삭하여 저장
+            latitude=round(request.latitude, 3) if request.latitude is not None else None,
+            longitude=round(request.longitude, 3) if request.longitude is not None else None,
             sound_enabled=request.sound_enabled,
             notification_status=request.notification_status,
         )

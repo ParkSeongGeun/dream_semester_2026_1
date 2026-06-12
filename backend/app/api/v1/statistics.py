@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.redis import get_cache, set_cache
+from app.core.security import pseudonymize_device_id
 from app.db.session import get_db
 from app.models.boarding_record import BoardingRecord
 from app.models.user_device import UserDevice
@@ -85,6 +86,8 @@ async def get_user_statistics(
     Raises:
         HTTPException 404: 기기를 찾을 수 없음
     """
+    # 개인정보 보호: 원본이 아닌 가명화된 device_id 로 조회·집계한다.
+    device_id = pseudonymize_device_id(device_id)
     cache_key = f"stats:user:{device_id}:{period}"
 
     # 1. 캐시 확인

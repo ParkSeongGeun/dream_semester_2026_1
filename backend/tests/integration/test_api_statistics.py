@@ -4,11 +4,14 @@ Statistics API 통합 테스트
 사용자 및 전역 통계 API를 테스트합니다.
 """
 
+import uuid
+
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from unittest.mock import AsyncMock, patch
 
+from app.core.security import pseudonymize_device_id
 from app.models.user_device import UserDevice
 from app.models.boarding_record import BoardingRecord
 
@@ -31,8 +34,10 @@ class TestUserStatisticsAPI:
 
     async def test_get_user_statistics_success(self, client: AsyncClient, test_db: AsyncSession):
         """사용자 통계 조회 - 성공 (기기 존재, 기록 없음)"""
-        # 테스트용 기기 생성
+        # 테스트용 기기 생성 (DB 에는 가명화된 device_id 가 저장됨)
+        raw_id = uuid.uuid4()
         device = UserDevice(
+            device_id=pseudonymize_device_id(raw_id),
             device_name="Test Device",
             app_version="1.0.0",
         )
@@ -42,8 +47,9 @@ class TestUserStatisticsAPI:
 
         with patch("app.api.v1.statistics.get_cache", new_callable=AsyncMock, return_value=None), \
              patch("app.api.v1.statistics.set_cache", new_callable=AsyncMock, return_value=True):
+            # 조회는 원본 device_id 로 (서버가 내부에서 가명화하여 매칭)
             response = await client.get(
-                f"/api/v1/statistics/user/{device.device_id}?period=30d"
+                f"/api/v1/statistics/user/{raw_id}?period=30d"
             )
 
             assert response.status_code == 200
@@ -55,8 +61,10 @@ class TestUserStatisticsAPI:
 
     async def test_get_user_statistics_with_records(self, client: AsyncClient, test_db: AsyncSession):
         """사용자 통계 조회 - 탑승 기록이 있는 경우"""
-        # 기기 생성
+        # 기기 생성 (DB 에는 가명화된 device_id 가 저장됨)
+        raw_id = uuid.uuid4()
         device = UserDevice(
+            device_id=pseudonymize_device_id(raw_id),
             device_name="Test Device",
             app_version="1.0.0",
         )
@@ -88,8 +96,9 @@ class TestUserStatisticsAPI:
 
         with patch("app.api.v1.statistics.get_cache", new_callable=AsyncMock, return_value=None), \
              patch("app.api.v1.statistics.set_cache", new_callable=AsyncMock, return_value=True):
+            # 조회는 원본 device_id 로 (서버가 내부에서 가명화하여 매칭)
             response = await client.get(
-                f"/api/v1/statistics/user/{device.device_id}?period=all"
+                f"/api/v1/statistics/user/{raw_id}?period=all"
             )
 
             assert response.status_code == 200
