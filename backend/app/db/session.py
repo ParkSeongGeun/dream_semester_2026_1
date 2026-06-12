@@ -28,6 +28,7 @@ if settings.environment == "development":
         database_url,
         echo=settings.db_echo,
         poolclass=NullPool,
+        connect_args={"server_settings": {"timezone": "Asia/Seoul"}},
     )
 else:
     engine = create_async_engine(
@@ -35,6 +36,7 @@ else:
         echo=settings.db_echo,
         pool_size=settings.db_pool_size,
         max_overflow=settings.db_max_overflow,
+        connect_args={"server_settings": {"timezone": "Asia/Seoul"}},
     )
 
 # 비동기 세션 팩토리
