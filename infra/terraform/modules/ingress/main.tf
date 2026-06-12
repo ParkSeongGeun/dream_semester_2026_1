@@ -21,7 +21,7 @@ resource "aws_lb_target_group" "main" {
   vpc_id   = var.vpc_id
 
   health_check {
-    path                = "/api/v1/health"
+    path                = "/api/v1/health/ready"
     protocol            = "HTTP"
     port                = "8000"
     healthy_threshold   = 2

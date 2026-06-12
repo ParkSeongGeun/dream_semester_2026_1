@@ -47,7 +47,7 @@ EXPOSE 8000
 
 # 헬스체크 (curl 대신 Python 사용으로 이미지 경량화)
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')" || exit 1
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health/ready')" || exit 1
 
 # DB 마이그레이션(alembic upgrade head) 후 Gunicorn + Uvicorn worker로 실행
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
